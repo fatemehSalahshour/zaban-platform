@@ -32,6 +32,13 @@ class SingleSession
             return $next($request);
         }
 
+        /* نشست بررسیِ مدیر از این قاعده معاف است. اگر نبود، نشانه‌ی دستگاهِ
+           کاربر با نشست مدیر بازنویسی می‌شد و کاربر واقعی همان لحظه از
+           دستگاه خودش بیرون می‌افتاد — بدون اینکه بفهمد چرا. */
+        if ($request->session()->has(\App\Http\Controllers\ImpersonateController::KEY)) {
+            return $next($request);
+        }
+
         $user = Auth::guard('web')->user();
         $mine = (string) $request->session()->get('device_token', '');
         $live = (string) ($user->session_token ?? '');

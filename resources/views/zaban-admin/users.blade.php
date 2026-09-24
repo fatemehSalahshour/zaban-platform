@@ -17,7 +17,7 @@
     <table>
       <thead>
         <tr><th>#</th><th>نام</th><th>ایمیل</th><th>نقش</th>
-            <th>نام مستعار</th><th>رشته‌های فعال</th></tr>
+            <th>نام مستعار</th><th>رشته‌های فعال</th><th></th></tr>
       </thead>
       <tbody>
         @foreach ($users as $u)
@@ -40,6 +40,14 @@
                 <span style="color:var(--ink-3)">—</span>
               @endforelse
             </td>
+            <td>
+              @if ($u->id !== auth()->id())
+                <form method="post" action="{{ route('impersonate.start', $u->id) }}" class="inline-form">
+                  @csrf
+                  <button class="btn ghost" type="submit">ورود به حساب</button>
+                </form>
+              @endif
+            </td>
           </tr>
         @endforeach
       </tbody>
@@ -49,7 +57,12 @@
   @endif
 </div>
 
+@if (session('error'))
+  <div class="panel" style="border-color:#b91c1c;color:#b91c1c">{{ session('error') }}</div>
+@endif
+
 <style>
+  .inline-form{margin:0}
   .search{display:flex;gap:10px;margin-bottom:18px}
   .search input{max-width:320px}
 </style>
