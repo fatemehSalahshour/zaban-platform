@@ -65,18 +65,19 @@ return [
 
 
         ],
-
+  
         'azmoon' => [
             'driver'    => 'mysql',
-            'host'      => '127.0.0.1',
-            'port'      => '3306',
-            'database'  => 'azmoon',
-            'username'  => 'root',
-            'password'  => '',
+            'host'      => env('AZMOON_DB_HOST', '127.0.0.1'),
+            'port'      => env('AZMOON_DB_PORT', '3306'),
+            'database'  => env('AZMOON_DB_DATABASE', 'azmoon'),
+            'username'  => env('AZMOON_DB_USERNAME', 'root'),
+            'password'  => env('AZMOON_DB_PASSWORD', ''),
             'charset'   => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
             'strict'    => false,
         ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),
