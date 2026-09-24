@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+auth.json
+storage/*.pem
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+/bootstrap/cache/*
+/node_modules
+/.idea
+/.vscode
+desktop.ini
+Thumbs.db
+/public/storage

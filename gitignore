@@ -1,0 +1,40 @@
+# ============================================================
+#  پلتفرم زبان — فایل‌هایی که نباید در گیت بروند
+#  نکته‌ی مهم: پوشه‌ی vendor عمداً اینجا نیست (یعنی در گیت می‌رود)،
+#  چون روی سرور به‌خاطر قفل امنیتی کانتینر نمی‌شود composer اجرا کرد.
+# ============================================================
+
+# --- رمزها و تنظیمات محیط: هرگز در گیت ---
+.env
+.env.*
+!.env.example
+auth.json
+
+# --- کلید درگاه پرداخت ---
+storage/*.pem
+storage/irankish-public.pem
+
+# --- فایل‌های ساخته‌شده و موقت لاراول ---
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/framework/testing/*
+/storage/logs/*
+/bootstrap/cache/*
+!.gitignore
+!**/.gitkeep
+
+# --- ابزارهای توسعه و سیستم‌عامل ---
+/node_modules
+/.idea
+/.vscode
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# --- فایل‌های کاری خودمان ---
+/public/storage
+*.sql
+!database/schema/*.sql
+content.sql
