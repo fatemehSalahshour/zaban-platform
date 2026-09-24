@@ -344,9 +344,5 @@ footer a:hover{color:var(--n-ink)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 
 /* ===== افزوده‌های اتصال به پلتفرم ===== */
-.nav .nav-login{color:var(--ink-2,#5b6167);font-size:14px;text-decoration:none;
-  padding:8px 12px;border-radius:9px;white-space:nowrap}
-.nav .nav-login:hover{color:var(--ink,#16191d);background:rgba(0,0,0,.04)}
 .flash-error{max-width:1180px;margin:14px auto 0;padding:11px 16px;border-radius:12px;
   background:#fbeee8;border:1px solid #edc9b8;color:#a8461f;font-size:14px;line-height:1.9}
-@media(max-width:720px){ .nav .nav-login{padding:6px 8px;font-size:13px} }

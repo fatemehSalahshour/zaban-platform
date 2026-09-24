@@ -28,8 +28,7 @@
       <a href="#offer">قیمت</a>
       <a href="#faq">سؤال‌ها</a>
     </nav>
-    <a class="nav-login" href="{{ route('login') }}">ورود</a>
-    <a class="btn btn-foil" href="#offer">شروع مرور کلمات</a>
+    <a class="btn btn-foil" href="{{ route('login') }}">شروع مرور کلمات</a>
   </div>
 </header>
 
@@ -45,7 +44,7 @@
       <h1>زبان کنکور را از ۲۵ سالِ خودِ کنکور یاد بگیر.</h1>
       <p class="hero-lead">همه‌ی کلمات و تست‌های زبان کنکور ارشد مهندسی کامپیوتر، آی‌تی و علوم کامپیوتر، از ۱۳۸۱ تا ۱۴۰۵، شمرده و سطح‌بندی و به ترتیب احتمال برگشت چیده شده‌اند. تو هر روز چند دقیقه مرور می‌کنی؛ پلتفرم یادش می‌ماند کدام کلمه دارد از ذهنت می‌رود.</p>
       <div class="hero-cta">
-        <a class="btn btn-foil" href="#offer">شروع مرور کلمات</a>
+        <a class="btn btn-foil" href="{{ route('login') }}">شروع مرور کلمات</a>
         <a class="btn btn-line" href="#method">امتحانش کن، همین‌جا</a>
       </div>
       <div class="hero-trust">
@@ -349,7 +348,7 @@
     <h2>صبح کنکور، دفترچه را باز می‌کنی و کلمه‌ها را می‌شناسی.</h2>
     <p>این حس اتفاقی نیست. نتیجه‌ی چند دقیقه در روز است، از همین امروز تا آن صبح.</p>
     <div class="countdown"><b id="finalDays">—</b><span>روز تا کنکور ارشد ۱۴۰۶</span></div>
-    <div><a class="btn btn-foil" href="#offer">شروع مرور کلمات</a></div>
+    <div><a class="btn btn-foil" href="{{ route('login') }}">شروع مرور کلمات</a></div>
   </div>
 </section>
 
@@ -360,7 +359,7 @@
   </div>
 </footer>
 
-<div class="mbar" id="mbar"><span><b id="mbarDays">—</b> روز تا کنکور</span><a class="btn btn-foil" href="#offer">شروع مرور</a></div>
+<div class="mbar" id="mbar"><span><b id="mbarDays">—</b> روز تا کنکور</span><a class="btn btn-foil" href="{{ route('login') }}">شروع مرور</a></div>
 
 <script>window.LANDING_EXAM = @json($examDate);</script>
 <script src="/js/landing.js?v={{ filemtime(public_path('js/landing.js')) }}"></script>

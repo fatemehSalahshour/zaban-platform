@@ -84,6 +84,9 @@ class ZabanSecurityTest extends TestCase
         $html = $this->get('/')->assertOk()->getContent();
         $this->assertStringContainsString('landing.css', $html);
         $this->assertStringContainsString(route('buy'), $html);           /* دکمه‌ی خرید واقعی */
+        /* «شروع مرور کلمات» کار ورود را می‌کند؛ لینک جدای «ورود» برداشته شد */
+        $this->assertStringContainsString(route('login'), $html);
+        $this->assertStringNotContainsString('nav-login', $html);
         $this->assertStringContainsString('2027-05-06', $html);           /* تاریخ کنکور از سرور */
         $faPrice = strtr(number_format($pricing->bundles()[3]),
             ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹',','=>'٬']);
