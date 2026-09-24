@@ -129,6 +129,7 @@ td.num{font-variant-numeric:tabular-nums;text-align:left;direction:ltr}
       @if ($openReports)<span class="nb">{{ $openReports }}</span>@endif</a>
     <a href="{{ route('zadmin.announcements') }}" class="{{ request()->routeIs('zadmin.announcements*') ? 'on' : '' }}">اطلاعیه‌ها</a>
     <a href="{{ route('zadmin.sync') }}" class="{{ request()->routeIs('zadmin.sync*') ? 'on' : '' }}">همگام‌سازی سؤال‌ها</a>
+    <a href="{{ route('zadmin.import.guide') }}" class="{{ request()->routeIs('zadmin.import.guide') ? 'on' : '' }}">راهنمای ورود اکسل</a>
     @php $newAlerts = \Illuminate\Support\Facades\DB::table('security_alerts')->whereNull('seen_at')->count(); @endphp
     <a href="{{ route('zadmin.alerts') }}" class="{{ request()->routeIs('zadmin.alerts') ? 'on' : '' }}">هشدارهای امنیتی
       @if ($newAlerts)<span class="nb">{{ $newAlerts }}</span>@endif</a>

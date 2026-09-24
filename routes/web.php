@@ -109,6 +109,9 @@ Route::middleware(['auth', 'zaban.admin'])
         Route::post('/sync/check', [ZabanAdminSyncController::class, 'check'])->name('sync.check');
         Route::post('/sync/apply', [ZabanAdminSyncController::class, 'apply'])->name('sync.apply');
 
+        /* راهنمای ورود اکسل‌ها — فقط متن است و هیچ کاری روی دیتابیس نمی‌کند */
+        Route::view('/import-guide', 'zaban-admin.import-guide')->name('import.guide');
+
         /* ---------- اطلاعیه‌ها ---------- */
         Route::get('/announcements', [ZabanAdminAnnouncementController::class, 'index'])->name('announcements');
         Route::post('/announcements', [ZabanAdminAnnouncementController::class, 'store'])->name('announcements.store');
