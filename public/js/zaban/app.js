@@ -1462,9 +1462,42 @@ const fCd=d=>Math.min(Math.max(+d.toFixed(2),1),10);
 const fInitS=r=>Math.max(FSRS_W[r-1],0.1);
 const fInitD=r=>fCd(FSRS_W[4]-Math.exp(FSRS_W[5]*(r-1))+1);
 function fRetr(t,s){ return s>0 ? Math.pow(1+FSRS_FACTOR*t/s,FSRS_DECAY) : 0 }
-function fIvl(s){
+/* پراکندگی — بازه را چند درصد جابه‌جا می‌کند تا کارت‌هایی که یک روز با هم
+   شروع شده‌اند تا ابد با هم برنگردند. دامنه‌ها همان انکی است.
+   تصادفیِ تکرارپذیر از روی کلید کارت: عددی که روی دکمه می‌بینید همان است
+   که ثبت می‌شود. باید مو‌به‌مو با Fsrs::fuzz() در سرور یکی بماند. */
+function fCrc32(str){
+  let c, crc=0xFFFFFFFF;
+  for(let i=0;i<str.length;i++){
+    c=(crc^str.charCodeAt(i))&0xFF;
+    for(let k=0;k<8;k++) c = c&1 ? (c>>>1)^0xEDB88320 : c>>>1;
+    crc=(crc>>>8)^c;
+  }
+  return (crc^0xFFFFFFFF)>>>0;
+}
+function fFuzz(ivl,seed){
+  if(ivl<3||!seed)return ivl;
+  let d = ivl<7 ? ivl*0.15 : (ivl<20 ? ivl*0.10 : ivl*0.05);
+  d = Math.max(1,d);
+  const ratio=(fCrc32(seed+'|'+ivl)%1000)/999;
+  return Math.max(1, ivl+Math.round((ratio*2-1)*d));
+}
+/* سقف کنکور: هیچ کارتی نباید بعد از جلسه برگردد. روز آخر کنار گذاشته
+   می‌شود چون مرور در خودِ روز کنکور فایده‌ای ندارد. */
+function fHorizon(){
+  /* daysToExam پایین‌تر در فایل تعریف شده ولی تابع است، پس هنگام صدا زدن
+     (که همیشه بعد از بارگذاری کامل است) در دسترس است. */
+  if(typeof daysToExam!=='function')return null;
+  const d=daysToExam()-1;
+  return d>0 ? d : null;
+}
+function fIvl(s,seed){
   const i=s/FSRS_FACTOR*(Math.pow(FSRS_RR,1/FSRS_DECAY)-1);
-  return Math.max(1,Math.min(FSRS_MAXI,Math.round(i)));
+  let ivl=Math.max(1,Math.min(FSRS_MAXI,Math.round(i)));
+  ivl=fFuzz(ivl,seed);
+  const h=fHorizon();
+  if(h!==null)ivl=Math.min(ivl,h);
+  return Math.max(1,ivl);
 }
 function fNextD(d,r){
   const dd=-FSRS_W[6]*(r-3);
@@ -1488,7 +1521,7 @@ function fShortS(s,rt){
   return s*si;
 }
 /** یک مرور را روی یک کپی حساب می‌کند و وضعیت تازه را برمی‌گرداند */
-function fsrsNext(c,rating,elapsed){
+function fsrsNext(c,rating,elapsed,seed){
   rating=Math.max(1,Math.min(4,rating));
   let s,d;
   if(c.s==null){ s=fInitS(rating); d=fInitD(rating); }
@@ -1499,14 +1532,25 @@ function fsrsNext(c,rating,elapsed){
     else if(rating===1)  s=fForgetS(c.d,c.s,R);
     else                 s=fRecallS(c.d,c.s,R,rating);
   }
-  return {s:+s.toFixed(4), d:+d.toFixed(4), iv:fIvl(s)};
+  return {s:+s.toFixed(4), d:+d.toFixed(4), iv:fIvl(s,seed)};
 }
 function elapsedOf(c){ return c.last==null ? 0 : Math.max(0, dayNow-c.last) }
 
 /** بازه‌ای که هر درجه می‌سازد — برای نوشتن روی چهار دکمه */
-function previewIv(c,r){
-  const n=fsrsNext(c,r,elapsedOf(c));
-  if(r===4){ const g=fsrsNext(c,3,elapsedOf(c)).iv; return Math.max(n.iv,g+1) }
+/* کلید پراکندگی باید مو‌به‌مو همان چیزی باشد که سرور می‌سازد: «w:<id>» یا
+   «q:<id>». کلید کارت («w|convenient») شناسه‌ی سرور نیست، پس با keyToItem
+   تبدیلش می‌کنیم. اگر تبدیل ممکن نبود بی‌پراکندگی حساب می‌شود — بدتر از
+   عددِ ناهمخوان نیست. */
+function fuzzSeed(key){
+  try{
+    const it = ZABAN.keyToItem ? ZABAN.keyToItem(key) : null;
+    return it && it.id ? it.t + ':' + it.id : '';
+  }catch(e){ return '' }
+}
+function previewIv(c,r,key){
+  const sd=fuzzSeed(key);
+  const n=fsrsNext(c,r,elapsedOf(c),sd);
+  if(r===4){ const g=fsrsNext(c,3,elapsedOf(c),sd).iv; return Math.max(n.iv,g+1) }
   return n.iv;
 }
 
@@ -1516,7 +1560,7 @@ function previewIv(c,r){
 function applyRating(key,r){
   const c=card(key);
   const el=elapsedOf(c);
-  const n=fsrsNext(c,r,el);
+  const n=fsrsNext(c,r,el,fuzzSeed(key));
 
   if(r===1){ c.lapses++; c.reps=0 } else c.reps++;
   c.s=n.s; c.d=n.d; c.iv=n.iv;
@@ -1711,7 +1755,9 @@ function paintCard(){
   if(flipped){
     const st=card(c.key);
     document.querySelectorAll("#rRate button").forEach(b=>{
-      b.querySelector("i").textContent=ivLabel(previewIv(st,+b.dataset.r));
+      /* کلید کارت لازم است: پراکندگی از روی آن حساب می‌شود، پس بدون آن
+         عددِ دکمه با چیزی که بعد از زدنش ثبت می‌شود فرق می‌کرد. */
+      b.querySelector("i").textContent=ivLabel(previewIv(st,+b.dataset.r,c.key));
     });
   }
 }
@@ -4438,7 +4484,11 @@ if(LS.get("zban_exam"))EX.stage=null;
 const MAT_MATURE=21;   // آستانه‌ی «مسلط» بر حسب روز — همان تعریف کارت بالغ در انکی
 const MAT_YOUNG=7;     // مرز «در حال یادگیری» و «آشنا»
 const LEECH_WARN=5;    // هشدار: پنج بار فراموشی روی یک کارت
-const MIN_CARD=2;      // کمینه‌ی مرور برای اینکه یک کارت قابل قضاوت باشد
+/* کمینه‌ی مرور برای اینکه یک کارت قابل قضاوت باشد.
+   با ۲، کارتی که از دو مرور یکی را فراموش کرده (۵۰٪) «ضعیف» می‌شد — با دو
+   نمونه این قضاوت خیلی پرنوسان است و یک اشتباه سهوی کافی بود. با ۳ پایدارتر
+   می‌شود. همان اصلاحی که بازبینی الگوریتم پلتفرم مرور پیشنهاد داد. */
+const MIN_CARD=3;
 const MIN_GROUP=8;     // کمینه‌ی کارت برای اینکه درباره‌ی یک گروه حرفی بزنیم
 
 const MAT_LABEL={new:"دیده‌نشده",weak:"ضعیف",learn:"در حال یادگیری",fam:"آشنا",strong:"مسلط"};

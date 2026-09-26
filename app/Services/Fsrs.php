@@ -37,14 +37,52 @@ class Fsrs
     private float $decay;
     private float $factor;
 
+    /** روزهای مانده تا کنکور؛ null یعنی بی‌سقف */
+    private ?int $horizonDays = null;
+
+    /** رشته‌ی ثابتی که پراکندگی را برای یک کارت تکرارپذیر می‌کند */
+    private string $fuzzSeed = '';
+
     public function __construct(
         ?array $w = null,
         private float $requestRetention = 0.90,   // هدف: ۹۰٪ احتمال یادآوری سر موعد
-        private int $maximumInterval = 3650,      // ده سال؛ برای کنکور عملاً بی‌اثر
+        private int $maximumInterval = 3650,      // ده سال؛ سقف واقعی را کنکور تعیین می‌کند
     ) {
         $this->w = $w ?: self::DEFAULT_W;
         $this->decay  = -$this->w[20];
         $this->factor = pow(0.9, 1 / $this->decay) - 1;
+    }
+
+    /**
+     * سقف کنکور.
+     *
+     * بدون این، کارتی که پایدار شده ممکن است بازه‌ی چندساله بگیرد و تا بعد از
+     * جلسه‌ی کنکور اصلاً برنگردد — یعنی دانشجو کلمه‌ای را که «مسلط» شده، ماه‌ها
+     * پیش از کنکور آخرین بار دیده باشد. با این سقف، هر کارت دست‌کم یک بار
+     * پیش از جلسه برمی‌گردد.
+     *
+     * روز آخر عمداً کنار گذاشته می‌شود: مرور در خودِ روز کنکور فایده‌ای ندارد.
+     */
+    public function horizon(?\DateTimeInterface $examDate): static
+    {
+        if (!$examDate) { $this->horizonDays = null; return $this; }
+
+        $days = (int) floor((strtotime($examDate->format('Y-m-d')) - strtotime(date('Y-m-d'))) / 86400) - 1;
+        $this->horizonDays = max(1, $days);
+        return $this;
+    }
+
+    /**
+     * کلید پراکندگی — معمولاً شناسه‌ی کارت.
+     *
+     * پراکندگی باید برای یک کارت همیشه یکسان باشد، وگرنه پیش‌نمایش دکمه‌ها
+     * («بازگشت: ۸ روز بعد») با چیزی که بعد از زدن دکمه ثبت می‌شود فرق می‌کند
+     * و کاربر فکر می‌کند سیستم دروغ گفته.
+     */
+    public function seed(string|int $key): static
+    {
+        $this->fuzzSeed = (string) $key;
+        return $this;
     }
 
     /* ================= ورودی اصلی ================= */
@@ -81,7 +119,7 @@ class Fsrs
             }
         }
 
-        $interval = $this->nextInterval($s);
+        $interval = $this->nextInterval($s, $rating);
 
         return [
             'stability'     => round($s, 4),
@@ -101,12 +139,45 @@ class Fsrs
         return pow(1 + $this->factor * $elapsedDays / $stability, $this->decay);
     }
 
-    /** بازه‌ای که در آن R به عدد هدف می‌رسد */
-    private function nextInterval(float $stability): int
+    /** بازه‌ای که در آن R به عدد هدف می‌رسد — با پراکندگی و سقف کنکور */
+    private function nextInterval(float $stability, int $rating = self::GOOD): int
     {
         $ivl = $stability / $this->factor
              * (pow($this->requestRetention, 1 / $this->decay) - 1);
-        return (int) max(1, min($this->maximumInterval, (int) round($ivl)));
+
+        $ivl = (int) max(1, min($this->maximumInterval, (int) round($ivl)));
+        $ivl = $this->fuzz($ivl);
+
+        /* سقف کنکور آخرین حرف را می‌زند: پراکندگی نباید از آن عبور کند. */
+        if ($this->horizonDays !== null) $ivl = min($ivl, $this->horizonDays);
+
+        return max(1, $ivl);
+    }
+
+    /**
+     * پراکندگی — بازه را چند درصد جابه‌جا می‌کند.
+     *
+     * بدون آن، کارت‌هایی که یک روز با هم شروع شده‌اند تا ابد با هم برمی‌گردند و
+     * روزهای شلوغ و خالی می‌سازند. دامنه‌ها همان انکی است و برای بازه‌های کوتاه
+     * پراکندگی نداریم، چون یک روز جابه‌جایی روی بازه‌ی دو روزه زیاد است.
+     */
+    private function fuzz(int $ivl): int
+    {
+        if ($ivl < 3 || $this->fuzzSeed === '') return $ivl;
+
+        $delta = match (true) {
+            $ivl < 7   => $ivl * 0.15,
+            $ivl < 20  => $ivl * 0.10,
+            default    => $ivl * 0.05,
+        };
+        $delta = max(1.0, $delta);
+
+        /* تصادفیِ تکرارپذیر: یک کارت همیشه همان جابه‌جایی را می‌گیرد */
+        $h = crc32($this->fuzzSeed . '|' . $ivl);
+        $ratio = ($h % 1000) / 999;                 // ۰ تا ۱
+        $shift = (int) round(($ratio * 2 - 1) * $delta);
+
+        return max(1, $ivl + $shift);
     }
 
     private function initStability(int $rating): float

@@ -790,11 +790,24 @@ class ZabanController extends Controller
                 ? ['stability' => (float) $card->stability, 'difficulty' => (float) $card->difficulty]
                 : null;
 
-            $r = $this->fsrs->retrievability($elapsed, (float) ($card->stability ?: 0));
-            $next = $this->fsrs->review($before, $d['rating'], $elapsed);
+            /* سقف کنکور و پراکندگی — هر دو باید پیش از review و preview تنظیم شوند،
+               وگرنه عددی که در دکمه نشان داده‌ایم با چیزی که ثبت می‌شود فرق می‌کند. */
+            /* وزن‌های همین کاربر (اگر بهینه‌ساز ساخته و پذیرفته باشد)، وگرنه
+               پیش‌فرض. سؤال‌ها رشته دارند و می‌توانند تنظیم دقیق‌تری بگیرند. */
+            $params = app(\App\Services\FsrsParams::class);
+            $fsrs   = $params->engine($uid, $params->examOf($type, (int) $d['id']));
+
+            /* کلید پراکندگی = نوع و شناسه‌ی همان آیتم؛ دقیقاً همان چیزی که
+               مرورگر هم دارد. اگر اینجا از deck_items.id استفاده می‌کردیم،
+               دو طرف دو عدد می‌ساختند و دکمه با آنچه ثبت می‌شود فرق می‌کرد. */
+            $fsrs->horizon(app(\App\Services\Pricing::class)->accessUntil())
+                 ->seed(($type === 'word' ? 'w' : 'q') . ':' . $d['id']);
+
+            $r = $fsrs->retrievability($elapsed, (float) ($card->stability ?: 0));
+            $next = $fsrs->review($before, $d['rating'], $elapsed);
 
             $justMastered = $card->mastered_at === null
-                && $this->fsrs->isMastered($next['stability'], $next['difficulty'], $next['interval_days']);
+                && $fsrs->isMastered($next['stability'], $next['difficulty'], $next['interval_days']);
 
             DB::table('deck_items')->where('id', $card->id)->update([
                 'stability'      => $next['stability'],
@@ -835,7 +848,7 @@ class ZabanController extends Controller
                 's' => $next['stability'],
                 'd' => $next['difficulty'],
                 'mastered' => $justMastered,
-                'preview' => $this->fsrs->preview($before, $elapsed),
+                'preview' => $fsrs->preview($before, $elapsed),
             ]);
         });
     }

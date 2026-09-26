@@ -848,6 +848,85 @@ class ZabanSecurityTest extends TestCase
         $this->assertLessThan(21, $next['interval_days'], 'فاصله باید کوتاه شود');
     }
 
+    public function test_interval_never_passes_the_exam_date(): void
+    {
+        /* کارتی که خیلی پایدار شده بازه‌ی چندساله می‌گیرد. بدون سقف، تا بعد از
+           کنکور برنمی‌گشت — یعنی دانشجو کلمه‌ی «مسلط» را ماه‌ها پیش از جلسه
+           آخرین بار دیده بود. */
+        $f    = app(Fsrs::class);
+        $card = ['stability' => 400.0, 'difficulty' => 3.0];
+
+        $free = $f->review($card, Fsrs::EASY, 30)['interval_days'];
+        $this->assertGreaterThan(60, $free, 'کارت پایدار باید بازه‌ی بلند بگیرد');
+
+        $capped = $f->horizon(now()->addDays(40))->review($card, Fsrs::EASY, 30);
+        $this->assertLessThanOrEqual(39, $capped['interval_days'],
+            'بازه نباید از روز کنکور بگذرد (روز آخر هم کنار گذاشته می‌شود)');
+        $this->assertLessThan(now()->addDays(40)->toDateString(), $capped['due_date']);
+    }
+
+    public function test_fuzz_spreads_cards_but_stays_stable_per_card(): void
+    {
+        $card = ['stability' => 30.0, 'difficulty' => 5.0];
+
+        /* یک کارت: هر بار همان عدد — وگرنه عددِ روی دکمه با آنچه ثبت می‌شود
+           فرق می‌کرد و کاربر فکر می‌کرد سیستم دروغ گفته. */
+        $a = app(Fsrs::class)->seed('w:412')->review($card, Fsrs::GOOD, 30)['interval_days'];
+        $b = app(Fsrs::class)->seed('w:412')->review($card, Fsrs::GOOD, 30)['interval_days'];
+        $this->assertSame($a, $b, 'یک کارت باید همیشه همان بازه را بگیرد');
+
+        /* کارت‌های مختلف: پخش می‌شوند تا همه یک روز با هم برنگردند */
+        $seen = [];
+        foreach (range(1, 40) as $i) {
+            $seen[] = app(Fsrs::class)->seed('w:' . $i)->review($card, Fsrs::GOOD, 30)['interval_days'];
+        }
+        $this->assertGreaterThan(1, count(array_unique($seen)), 'بازه‌ها باید پخش شوند');
+    }
+
+    public function test_personal_weights_are_used_only_after_acceptance(): void
+    {
+        $params = app(\App\Services\FsrsParams::class);
+        $user   = $this->userWith(['ce']);
+
+        /* وزن دست‌کاری‌شده که اثرش در بازه دیده می‌شود */
+        $odd = \App\Services\Fsrs::DEFAULT_W;
+        $odd[8] = $odd[8] * 3;
+
+        DB::table('zaban_fsrs_params')->insert([
+            'user_id' => $user->id, 'exam' => '', 'w' => json_encode($odd),
+            'accepted' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        /* رد شده → باید همان پیش‌فرض بماند */
+        $this->assertSame(\App\Services\Fsrs::DEFAULT_W, (new \App\Services\FsrsParams)->weights($user->id));
+
+        DB::table('zaban_fsrs_params')->where('user_id', $user->id)->update(['accepted' => true]);
+        $this->assertNotSame(\App\Services\Fsrs::DEFAULT_W, (new \App\Services\FsrsParams)->weights($user->id));
+
+        /* کاربر دیگری نباید تنظیم این یکی را بگیرد */
+        $other = $this->userWith(['ce']);
+        $this->assertSame(\App\Services\Fsrs::DEFAULT_W, (new \App\Services\FsrsParams)->weights($other->id));
+    }
+
+    public function test_broken_weights_fall_back_to_defaults(): void
+    {
+        /* یک ردیف خراب نباید کل مرور را بخواباند */
+        $user = $this->userWith(['ce']);
+        DB::table('zaban_fsrs_params')->insert([
+            'user_id' => $user->id, 'exam' => '', 'w' => json_encode([1, 2, 3]),
+            'accepted' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->assertSame(\App\Services\Fsrs::DEFAULT_W, (new \App\Services\FsrsParams)->weights($user->id));
+    }
+
+    public function test_optimizer_needs_enough_data(): void
+    {
+        /* با دیتابیس خالی نباید چیزی بسازد — نه خطا بدهد، نه وزن بی‌پشتوانه */
+        $this->artisan('zaban:fsrs-optimize', ['--global' => true])->assertSuccessful();
+        $this->assertDatabaseCount('zaban_fsrs_params', 0);
+    }
+
     public function test_review_forgot_counts_lapse(): void
     {
         $user = $this->userWith(['ce']);

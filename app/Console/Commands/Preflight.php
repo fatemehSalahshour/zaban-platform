@@ -61,6 +61,12 @@ class Preflight extends Command
                 ->map(fn ($r) => (string) array_values((array) $r)[0])->implode(' ');
             $write = preg_match('/\b(ALL PRIVILEGES|INSERT|UPDATE|DELETE|DROP|ALTER)\b/i', $grants);
             $this->soft(!$write, 'کاربر azmoon فقط‌خواندنی', 'کاربر اتصال azmoon اجازه‌ی نوشتن دارد؛ یک کاربر فقط SELECT بسازید (docs/DEPLOY.md)');
+
+            /* رشته‌ی هر سؤال از جدول واسط question_major خوانده می‌شود. بدون آن،
+               همگام‌سازی خطای SQL می‌دهد؛ این بررسی زودتر و روشن‌تر می‌گویدش. */
+            $hasPivot = DB::connection('azmoon')->getSchemaBuilder()->hasTable('question_major');
+            $this->check($hasPivot, 'جدول question_major در azmoon',
+                'جدول question_major نیست — همگام‌سازی سؤال‌ها کار نمی‌کند. سمت پلتفرم آزمون باید اعمال شود.');
         } catch (\Throwable $e) {
             $this->check(false, '', 'اتصال به azmoon برقرار نشد: ' . mb_substr($e->getMessage(), 0, 120));
         }

@@ -55,13 +55,15 @@ class ZabanAdminController extends Controller
     private function contentGaps(): array
     {
         try {
-            $expected = DB::connection('azmoon')->table('question')
-                ->where('is_language', 1)->where('parent_id', 0)
-                ->where('type', 'sarasari')->where('status', '!=', 'deleted')
-                ->whereIn('major_id', [1, 2, 3])
-                ->selectRaw('year, major_id,
-                             SUM(CASE WHEN kind IN (2,3) THEN childes_count ELSE 1 END) AS n')
-                ->groupBy('year', 'major_id')
+            /* رشته از جدول واسط question_major (یک سؤال می‌تواند چند رشته داشته باشد) */
+            $expected = DB::connection('azmoon')->table('question as q')
+                ->join('question_major as qm', 'qm.question_id', '=', 'q.id')
+                ->where('q.is_language', 1)->where('q.parent_id', 0)
+                ->where('q.type', 'sarasari')->where('q.status', '!=', 'deleted')
+                ->whereIn('qm.major_id', [1, 2, 3])
+                ->selectRaw('q.year AS year, qm.major_id AS major_id,
+                             SUM(CASE WHEN q.kind IN (2,3) THEN q.childes_count ELSE 1 END) AS n')
+                ->groupBy('q.year', 'qm.major_id')
                 ->get();
         } catch (\Throwable $e) {
             /* دیتابیس آزمون در دسترس نیست — بهتر است پنل بگوید نمی‌داند

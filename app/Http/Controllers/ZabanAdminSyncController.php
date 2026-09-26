@@ -92,6 +92,61 @@ class ZabanAdminSyncController extends Controller
     }
 
     /**
+     * خروجی خام دستور را به جدول قابل خواندن تبدیل می‌کند.
+     *
+     * متن خام در یک <pre> به‌هم می‌ریخت: هر خط ترکیب فارسی و لاتین است
+     * («✓ 1404 ce — 25 سؤال») و مرورگر جهت را برای هر خط جدا حدس می‌زد،
+     * پس سال و رشته گاهی آخر خط می‌افتاد. حالا هر خط جدا می‌شود و هر تکه
+     * در خانه‌ی خودش با جهت درست نمایش داده می‌شود.
+     *
+     * خروجی: ['rows' => [...], 'ok' => n, 'bad' => n, 'skip' => n, 'rest' => "..."]
+     */
+    public static function parseLog(string $log): array
+    {
+        $fa   = ['ce' => 'مهندسی کامپیوتر', 'it' => 'آی‌تی', 'cs' => 'علوم کامپیوتر'];
+        $rows = [];
+        $rest = [];
+        $seen = [];   /* برای اینکه فهرست تکراری انتهای گزارش دوباره نیاید */
+
+        foreach (preg_split('/\R/u', $log) as $line) {
+            $t = trim($line);
+            if ($t === '') continue;
+
+            /* «✓ 1404 ce — 25 سؤال» یا «! 1403 cs — …» یا «- 1402 cs — خالی، رد شد» */
+            if (preg_match('/^([✓!\-])\s+(\d{4})\s+(ce|it|cs)\s+—\s+(.+)$/u', $t, $m)) {
+                $key = $m[2] . $m[3];
+                if (isset($seen[$key])) continue;
+                $seen[$key] = true;
+                $rows[] = [
+                    'state' => $m[1] === '✓' ? 'ok' : ($m[1] === '!' ? 'bad' : 'skip'),
+                    'year'  => $m[2],
+                    'exam'  => $fa[$m[3]] ?? $m[3],
+                    'code'  => $m[3],
+                    'note'  => trim($m[4]),
+                ];
+                continue;
+            }
+
+            /* فهرست تکراری انتهای گزارش: «1403 cs: بخش …» */
+            if (preg_match('/^(\d{4})\s+(ce|it|cs):/u', $t)) continue;
+
+            /* سرشماری‌ها و خطوط توضیحی را جدا نگه می‌داریم */
+            if (preg_match('/^(همخوان|دفترچه‌های ناهمخوان)/u', $t)) continue;
+            if (preg_match('/^\d+ دفترچه پیدا شد/u', $t)) continue;
+
+            $rest[] = $t;
+        }
+
+        return [
+            'rows' => $rows,
+            'ok'   => count(array_filter($rows, fn ($r) => $r['state'] === 'ok')),
+            'bad'  => count(array_filter($rows, fn ($r) => $r['state'] === 'bad')),
+            'skip' => count(array_filter($rows, fn ($r) => $r['state'] === 'skip')),
+            'rest' => implode("\n", $rest),
+        ];
+    }
+
+    /**
      * سال‌هایی که در بانک کلمات هستند ولی سؤالشان در سایت نیست — دفترچه‌ای که
      * اصلاً در پلتفرم آزمون ساخته نشده در گزارش «دفترچه‌های ناقص» داشبورد نمی‌آمد.
      */

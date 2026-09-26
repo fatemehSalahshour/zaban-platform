@@ -356,6 +356,10 @@ window.ZABAN = (function () {
   const api = {
     LS,
 
+    /* برای پراکندگی بازه‌ها لازم است: کلید پراکندگی باید همان «t:id» باشد که
+       سرور می‌سازد، وگرنه عددِ روی دکمه با آنچه ثبت می‌شود یکی درنمی‌آید. */
+    keyToItem,
+
     async boot(main) {
       try {
         const exam = document.documentElement.dataset.exam || '';

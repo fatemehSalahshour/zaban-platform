@@ -132,21 +132,26 @@ class SyncQuestions extends Command
     /** فهرست دفترچه‌ها: هر ترکیب سال و رشته یک دفترچه است. */
     private function books(): array
     {
-        $q = DB::connection('azmoon')->table('question')
-            ->where('is_language', 1)
-            ->where('parent_id', 0)
-            ->where('type', 'sarasari')
-            ->whereIn('major_id', array_keys(self::MAJOR))
-            ->where('status', '!=', 'deleted')
-            ->selectRaw('year, major_id, COUNT(*) AS parents')
-            ->groupBy('year', 'major_id')
-            ->orderByDesc('year')->orderBy('major_id');
+        /* رشته‌ی سؤال از جدول واسط question_major خوانده می‌شود، نه از ستون
+           question.major_id. آن ستون حالا فقط «رشته‌ی اصلی» است؛ سؤالی که بین
+           دو رشته مشترک باشد با ستون قدیمی فقط در یکی دیده می‌شد و دفترچه‌ی
+           رشته‌ی دیگر بی‌صدا ناقص می‌ماند. */
+        $q = DB::connection('azmoon')->table('question as q')
+            ->join('question_major as qm', 'qm.question_id', '=', 'q.id')
+            ->where('q.is_language', 1)
+            ->where('q.parent_id', 0)
+            ->where('q.type', 'sarasari')
+            ->whereIn('qm.major_id', array_keys(self::MAJOR))
+            ->where('q.status', '!=', 'deleted')
+            ->selectRaw('q.year AS year, qm.major_id AS major_id, COUNT(*) AS parents')
+            ->groupBy('q.year', 'qm.major_id')
+            ->orderByDesc('q.year')->orderBy('qm.major_id');
 
-        if ($y = $this->option('year')) $q->where('year', $y);
+        if ($y = $this->option('year')) $q->where('q.year', $y);
         if ($e = $this->option('exam')) {
             $id = array_search($e, self::MAJOR, true);
             if ($id === false) { $this->error("رشته‌ی نامعتبر: $e"); return []; }
-            $q->where('major_id', $id);
+            $q->where('qm.major_id', $id);
         }
 
         return $q->get()->all();
@@ -161,7 +166,13 @@ class SyncQuestions extends Command
         $parents = DB::connection('azmoon')->table('question')
             ->where('is_language', 1)->where('parent_id', 0)
             ->where('type', 'sarasari')
-            ->where('year', $book->year)->where('major_id', $book->major_id)
+            ->where('year', $book->year)
+            /* IN (SELECT…) و نه join — با join سؤالِ مشترک بین دو رشته دو بار
+               برمی‌گشت و شماره‌ی دفترچه جلو می‌افتاد. */
+            ->whereIn('id', function ($sub) use ($book) {
+                $sub->select('question_id')->from('question_major')
+                    ->where('major_id', $book->major_id);
+            })
             ->where('status', '!=', 'deleted')
             ->orderBy('sort')->orderBy('id')   /* sort در بعضی سال‌ها صفر است */
             ->get();

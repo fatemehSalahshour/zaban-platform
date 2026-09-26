@@ -44,11 +44,59 @@
 @endif
 
 @if ($last)
+@php $rep = \App\Http\Controllers\ZabanAdminSyncController::parseLog($last['log']); @endphp
 <div class="panel">
   <h3>گزارش آخرین اجرا</h3>
-  <p>{{ ['check' => 'بررسی', 'done' => 'همگام‌سازی موفق', 'failed' => 'ناموفق'][$last['status']] ?? $last['status'] }}
-     — {{ $last['at'] }} — {{ $last['by'] }} — {{ $last['seconds'] }} ثانیه</p>
-  <pre class="log" dir="auto">{{ $last['log'] }}</pre>
+  <p class="runmeta">{{ ['check' => 'بررسی', 'done' => 'همگام‌سازی موفق', 'failed' => 'ناموفق'][$last['status']] ?? $last['status'] }}
+     — {{ $last['at'] }} — {{ $last['by'] }} — {{ round($last['seconds']) }} ثانیه</p>
+
+  @if ($rep['rows'])
+    <div class="sum">
+      <span class="chip all">{{ count($rep['rows']) }} دفترچه</span>
+      <span class="chip ok">{{ $rep['ok'] }} سالم</span>
+      @if ($rep['bad'])<span class="chip bad">{{ $rep['bad'] }} ناهمخوان</span>@endif
+      @if ($rep['skip'])<span class="chip skip">{{ $rep['skip'] }} خالی</span>@endif
+    </div>
+
+    {{-- ناهمخوان‌ها اول می‌آیند: همان‌هایی که کار لازم دارند --}}
+    @php $bad = array_filter($rep['rows'], fn ($r) => $r['state'] !== 'ok'); @endphp
+    @if ($bad)
+      <h4 class="sec bad">نیاز به رسیدگی</h4>
+      <table class="rep">
+        <tr><th>سال</th><th>رشته</th><th>مشکل</th></tr>
+        @foreach ($bad as $r)
+          <tr class="{{ $r['state'] }}">
+            <td class="num">{{ $r['year'] }}</td>
+            <td>{{ $r['exam'] }}</td>
+            <td class="note">{{ $r['note'] }}</td>
+          </tr>
+        @endforeach
+      </table>
+    @endif
+
+    @php $good = array_filter($rep['rows'], fn ($r) => $r['state'] === 'ok'); @endphp
+    @if ($good)
+      <details class="fold">
+        <summary>{{ count($good) }} دفترچه‌ی سالم</summary>
+        <table class="rep">
+          <tr><th>سال</th><th>رشته</th><th>نتیجه</th></tr>
+          @foreach ($good as $r)
+            <tr class="ok"><td class="num">{{ $r['year'] }}</td><td>{{ $r['exam'] }}</td>
+                <td class="note">{{ $r['note'] }}</td></tr>
+          @endforeach
+        </table>
+      </details>
+    @endif
+  @endif
+
+  @if (trim($rep['rest']) !== '')
+    <div class="rest">{{ $rep['rest'] }}</div>
+  @endif
+
+  <details class="fold">
+    <summary>متن کامل گزارش</summary>
+    <pre class="log" dir="auto">{{ $last['log'] }}</pre>
+  </details>
 </div>
 @endif
 
@@ -57,5 +105,37 @@
   .log{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;
        font-size:12.5px;line-height:1.9;max-height:420px;overflow:auto;white-space:pre-wrap;
        font-family:Vazirmatn,ui-monospace,monospace}
+
+  .runmeta{color:var(--ink-2,#6b7787);font-size:13px;margin:2px 0 12px}
+
+  /* خلاصه‌ی بالای گزارش */
+  .sum{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+  .chip{padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid transparent}
+  .chip.all {background:#eef2f7;color:#41505f;border-color:#dde4ec}
+  .chip.ok  {background:#eaf5ef;color:#1d6b58;border-color:#c9e4d6}
+  .chip.bad {background:#fdf0e8;color:#a8461f;border-color:#f0d3c2}
+  .chip.skip{background:#f5f2e8;color:#7a6a3e;border-color:#e6dfc9}
+
+  .sec{font-size:14px;margin:16px 0 8px}
+  .sec.bad{color:#a8461f}
+
+  /* جدول گزارش — هر تکه در خانه‌ی خودش، پس جهت به هم نمی‌ریزد */
+  table.rep{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.rep th{background:#f4f7fa;text-align:right;padding:7px 10px;font-weight:600;
+       border-bottom:1px solid var(--line);white-space:nowrap}
+  table.rep td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.rep td.num{direction:ltr;text-align:center;font-variant-numeric:tabular-nums;
+       width:62px;white-space:nowrap}
+  table.rep td.note{line-height:1.9}
+  table.rep tr.bad  td.num{color:#a8461f;font-weight:600}
+  table.rep tr.skip td{color:#7a6a3e}
+  table.rep tr.ok   td.note{color:var(--ink-2,#6b7787)}
+
+  .fold{margin-top:12px}
+  .fold>summary{cursor:pointer;font-size:13.5px;color:#41505f;padding:6px 0;user-select:none}
+  .fold>summary:hover{color:#16324f}
+
+  .rest{background:#fbfcfd;border:1px solid var(--line);border-radius:8px;padding:10px 14px;
+       margin-top:14px;font-size:13px;line-height:2;white-space:pre-wrap;color:#4a5866}
 </style>
 @endsection
