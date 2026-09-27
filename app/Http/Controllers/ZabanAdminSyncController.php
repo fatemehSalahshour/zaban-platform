@@ -80,6 +80,7 @@ class ZabanAdminSyncController extends Controller
            دارد؛ اگر محتوای تازه‌ای اضافه شد، همان‌جا خودش را پیدا نکند. */
         if ($status === 'done') {
             Cache::forget('zaban.exam_stats');
+            foreach (\App\Services\LandingFacts::CACHE_KEYS as $k) Cache::forget($k);
         }
 
         Cache::forever(self::LAST, [

@@ -118,6 +118,14 @@ h1,h2,h3,p{margin:0}
 .ledger b{display:block;font-family:var(--fa-display);font-weight:500;font-size:52px;line-height:1.05;color:var(--ink)}
 .ledger span{font-size:15px;color:var(--ink-2)}
 @media(max-width:820px){.ledger .wrap{grid-template-columns:1fr 1fr}.ledger div{padding:26px 16px}.ledger div:nth-child(3){border-inline-start:0;padding-inline-start:0}.ledger div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+/* در موبایل عدد ۵۲ پیکسلی با صفرِ ستون اول (padding-inline-start:0) به لبه
+   می‌چسبید و می‌زد بیرون. عدد کوچک‌تر می‌شود و ستون اول هم کمی فاصله می‌گیرد. */
+@media(max-width:560px){
+  .ledger b{font-size:34px}
+  .ledger span{font-size:13.5px;line-height:1.75}
+  .ledger div{padding:20px 12px}
+  .ledger div:first-child,.ledger div:nth-child(3){padding-inline-start:12px}
+}
 
 /* ============ الگو: بافت تکرار ============ */
 .pattern .wrap{display:grid;grid-template-columns:.9fr 1.3fr;gap:70px;align-items:start}

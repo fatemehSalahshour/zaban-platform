@@ -255,29 +255,29 @@ button[data-tip],a[data-tip],.pk[data-tip]{cursor:pointer}
 /* خوشه‌ی بخشی که الان در آن هستید */
 .ngrp.on{background:var(--gold-soft);border-color:var(--gold-line)}
 .ngrp .gl{display:flex;align-items:center;gap:4px;font-style:normal;font-size:11px;
-  color:var(--ink-3);padding:0 8px 0 5px;white-space:nowrap;flex-shrink:0}
+  color:var(--ink-3);padding:0 6px 0 3px;white-space:nowrap;flex-shrink:0}
 .ngrp.on .gl{color:#a08341}
 .ngrp .nb{background:#a8461f;color:#fff;font-size:10px;min-width:16px;height:16px;
   border-radius:20px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px}
 .nav1 a .nb{margin-right:5px}
-.ndiv{width:1px;height:22px;background:var(--line);flex-shrink:0;margin:0 6px}
-.nav1 button,.nav1 a{padding:7px 11px;border-radius:8px;font-size:13px;color:var(--ink-2);
+.ndiv{width:1px;height:22px;background:var(--line);flex-shrink:0;margin:0 3px}
+.nav1 button,.nav1 a{padding:7px 8px;border-radius:8px;font-size:12.5px;color:var(--ink-2);
   white-space:nowrap;flex-shrink:0;transition:.13s;border:1px solid transparent;text-decoration:none;display:inline-block}
 .nav1 button:hover,.nav1 a:hover{background:var(--gold-soft);border-color:var(--gold-line);color:#7d6320}
 .nav1 button.on,.nav1 a.on{background:var(--ink);color:#fff;font-weight:600;border-color:var(--ink)}
 .nav1 button.on:hover,.nav1 a.on:hover{background:#000;color:#fff;border-color:#000}
-/* «خرید» آخرین آیتم ردیف است و با اضافه شدنش ردیف از عرض صفحه بیرون می‌زد و
-   دقیقاً همین یکی زیر لبه گم می‌شد و کلیک نمی‌خورد. به جای کوچک‌کردن بقیه،
-   این یکی به لبه می‌چسبد: ردیف زیرش اسکرول می‌شود، خودش همیشه سر جایش است. */
-.nav1 .ngrp.buygrp{position:sticky;left:0;z-index:2;background:var(--paper);
-  padding-left:4px;box-shadow:-10px 0 10px -7px rgba(0,0,0,.14)}
-.nav1 .ngrp.buygrp.on{background:var(--gold-soft)}
+/* «خرید و پرداخت‌ها» آخرین آیتم ردیف است. با فاصله‌های فشرده‌ی بالا در نمایشگر
+   معمولی کنار بقیه جا می‌شود؛ ولی در عرض کم که ردیف اسکرول می‌شود، همین یکی
+   زیر لبه گم می‌شد و کلیک نمی‌خورد — پس به لبه می‌چسبد و همیشه سر جایش است.
+   خط جداکننده‌ی کنارش هم جای سایه را می‌گیرد تا روی بقیه نیفتد. */
+.nav1 .ngrp.buygrp{position:sticky;left:0;z-index:2;background:var(--paper);padding-inline-start:3px}
+.nav1 .ngrp.buygrp.on{background:var(--paper)}
 /* در تم تیره، قرص سیاه روی زمینه‌ی تیره دیده نمی‌شود */
 html[data-theme="dim"] .nav1 button.on,html[data-theme="dark"] .nav1 button.on,
 html[data-theme="dim"] .nav1 a.on,html[data-theme="dark"] .nav1 a.on{
   background:linear-gradient(95deg,#8f6d1f,#d4ab52);color:#14171a;border-color:#8f6d1f}
-@media(max-width:760px){.nav1{padding:5px}.nav1 button,.nav1 a{padding:7px 10px;font-size:13px}
-  .ngrp .gl{padding:0 6px 0 3px}.ndiv{margin:0 4px}}
+@media(max-width:760px){.nav1{padding:5px}.nav1 button,.nav1 a{padding:7px 7px;font-size:12.5px}
+  .ngrp .gl{padding:0 4px 0 2px}.ndiv{margin:0 2px}}
 
 /* دکمه‌ی داشبورد — از ردیف ناوبری بیرون آمد و اینجا نشست */
 .dashbtn{display:flex;align-items:center;gap:6px;height:38px;padding:0 14px;

@@ -13,13 +13,16 @@ use App\Http\Controllers\ZabanAdminAlertController;
 
 /* صفحه‌ی ورودی = لندینگ پیج. کاربر واردشده مستقیم به پلتفرم می‌رود؛ مهمان لندینگ را
    می‌بیند با دکمه‌ی ورود، قیمت و تاریخ کنکور از سرور، و پیام خطای ورود SSO اگر بود. */
-Route::get('/', function (\App\Services\Pricing $pricing) {
+Route::get('/', function (\App\Services\Pricing $pricing, \App\Services\LandingFacts $facts) {
     if (auth()->check()) return redirect()->route('zaban');
 
     return view('landing', [
         /* عدد فارسی با جداکننده‌ی فارسی — بقیه‌ی صفحه هم با رقم فارسی است */
         'price'    => \App\Support\FaNum::format($pricing->bundles()[3] ?? 0),   /* هر سه رشته */
         'examDate' => $pricing->accessUntil(),         /* میلادی؛ شمارش معکوس صفحه */
+        /* اعداد و کلمه‌های نمونه از خود بانک — قبلاً در HTML و landing.js ثابت بودند */
+        'facts'    => $facts->facts(),
+        'words'    => $facts->words(),
     ]);
 })->name('home');
 

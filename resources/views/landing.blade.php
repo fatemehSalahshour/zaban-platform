@@ -48,8 +48,8 @@
         <a class="btn btn-line" href="#method">امتحانش کن، همین‌جا</a>
       </div>
       <div class="hero-trust">
-        <div><b>۲۵ سال</b>دفترچه‌ی کنکور، کامل</div>
-        <div><b>۳ رشته</b>مهندسی کامپیوتر، آی‌تی، علوم کامپیوتر</div>
+        <div><b>{{ \App\Support\FaNum::format($facts['years']) }} سال</b>دفترچه‌ی کنکور، کامل</div>
+        <div><b>{{ \App\Support\FaNum::format($facts['exams']) }} رشته</b>مهندسی کامپیوتر، آی‌تی، علوم کامپیوتر</div>
         <div><b id="heroDays">—</b>روز تا کنکور ۱۴۰۶</div>
       </div>
     </div>
@@ -64,10 +64,10 @@
       <div class="mean" id="mean"></div>
       <div class="ribbon">
         <div class="ribbon-cells" id="ribbon" aria-hidden="true"></div>
-        <div class="ribbon-axis"><span>۱۳۸۱</span><span>۱۳۹۳</span><span>۱۴۰۵</span></div>
+        <div class="ribbon-axis"><span>{{ \App\Support\FaNum::format($facts['y1']) }}</span><span>{{ \App\Support\FaNum::format((int) (($facts['y1'] + $facts['y2']) / 2)) }}</span><span>{{ \App\Support\FaNum::format($facts['y2']) }}</span></div>
       </div>
       <div class="plate-foot">
-        <span>در <b id="yrs">۲۵</b> کنکور از ۲۵ آمده</span>
+        <span>در <b id="yrs">۰</b> کنکور از {{ \App\Support\FaNum::format($facts['years']) }} آمده</span>
         <span class="plate-dots" id="dots" role="tablist" aria-label="کلمه‌ها"></span>
       </div>
       <figcaption class="plate-cap">هر خانه‌ی طلایی یعنی این کلمه در کنکور آن سال پرسیده شده.</figcaption>
@@ -76,11 +76,16 @@
 </section>
 
 <!-- ============ دفتر حقایق ============ -->
+@php
+  /* اگر بانک خالی باشد (نصب تازه) عددها صفر می‌شوند و جمله بی‌معنا؛ در آن
+     حالت همان متن عمومی بدون عدد نشان داده می‌شود. */
+  $fa = fn ($n) => \App\Support\FaNum::format((int) $n);
+@endphp
 <div class="ledger">
   <div class="wrap">
-    <div><b>۷۵</b><span>دفترچه‌ی کنکور زبان، از سه رشته</span></div>
-    <div><b>۲۵</b><span>سال پیاپی، از ۱۳۸۱ تا ۱۴۰۵</span></div>
-    <div><b>۳</b><span>بخش آزمون: وکب، کلوز تست، پسیج</span></div>
+    <div><b>{{ $fa($facts['booklets']) }}</b><span>دفترچه‌ی کنکور زبان، از {{ $fa($facts['exams']) }} رشته</span></div>
+    <div><b>{{ $fa($facts['years']) }}</b><span>سال پیاپی@if ($facts['y1'] && $facts['y2'])، از {{ $fa($facts['y1']) }} تا {{ $fa($facts['y2']) }}@endif</span></div>
+    <div><b>{{ $fa($facts['sections']) }}</b><span>بخش آزمون: وکب، کلوز تست، پسیج</span></div>
     <div><b>۴</b><span>حالت مرور: دو جهت کلمه، تست‌ها، همه با هم</span></div>
   </div>
 </div>
@@ -361,7 +366,13 @@
 
 <div class="mbar" id="mbar"><span><b id="mbarDays">—</b> روز تا کنکور</span><a class="btn btn-foil" href="{{ route('login') }}">شروع مرور</a></div>
 
-<script>window.LANDING_EXAM = @json($examDate);</script>
+<script>
+window.LANDING_EXAM = @json($examDate);
+/* کلمه‌های کارت بالای صفحه و جدول الگو — از بانک واقعی. اگر خالی باشد،
+   landing.js خودش به نمونه‌ی داخلی‌اش برمی‌گردد و صفحه خالی نمی‌ماند. */
+window.LANDING_WORDS = @json($words);
+window.LANDING_YEARS = @json([$facts['y1'], $facts['y2']]);
+</script>
 <script src="/js/landing.js?v={{ filemtime(public_path('js/landing.js')) }}"></script>
 </body>
 </html>
