@@ -76,6 +76,32 @@ if (app()->environment('local')) {
 | پنل مدیریت — همه‌ی مسیرها زیر یک گروه، با یک prefix و یک middleware.
 | گروه تو در تو با prefix دوباره نسازید: آدرس «/zaban-admin/zaban-admin/...» می‌شود.
 */
+/*
+| توکن تازه‌ی CSRF.
+|
+| وقتی نشست عوض می‌شود (ورود به حساب کاربر، خروج، یا انقضای دو ساعته)، تبی که
+| باز مانده توکن باطل دارد و هر درخواستش ۴۱۹ می‌گیرد. رابط با گرفتن این آدرس
+| توکن تازه می‌گیرد و همان درخواست را دوباره می‌فرستد، بدون اینکه کاربر چیزی
+| ببیند. پاسخ چیزی جز خود توکن ندارد، پس افشای اطلاعاتی در کار نیست.
+*/
+Route::get('/csrf', fn () => response()->json(['token' => csrf_token()]))->name('csrf');
+
+/*
+| ورود به حساب کاربر (پشتیبانی).
+|
+| بیرون از گروه پنل، چون نامشان نباید «zadmin.» بگیرد؛ ویو با نام
+| impersonate.start صدایشان می‌زند.
+|
+| ⚠ «خروج» فقط auth دارد، نه zaban.admin: در آن لحظه مدیر به‌شکل دانشجو وارد
+| است و اگر zaban.admin بگذاریم، راه برگشت خودش بسته می‌شود. کنترلر خودش
+| بررسی می‌کند که نشستِ ذخیره‌شده‌ی مدیر وجود دارد.
+*/
+Route::post('/impersonate/{id}', [\App\Http\Controllers\ImpersonateController::class, 'start'])
+    ->middleware(['auth', 'zaban.admin'])->whereNumber('id')->name('impersonate.start');
+
+Route::post('/impersonate-stop', [\App\Http\Controllers\ImpersonateController::class, 'stop'])
+    ->middleware('auth')->name('impersonate.stop');
+
 Route::middleware(['auth', 'zaban.admin'])
     ->prefix('zaban-admin')
     ->name('zadmin.')
@@ -87,6 +113,14 @@ Route::middleware(['auth', 'zaban.admin'])
         Route::post('/settings', [ZabanAdminController::class, 'saveSettings'])->name('settings.save');
 
         Route::get('/users', [ZabanAdminController::class, 'users'])->name('users');
+
+        /* اصلاح پیوند کلمه به سؤال — ظهور اشتباهی که از اکسل آمده */
+        Route::get('/words', [\App\Http\Controllers\ZabanAdminWordsController::class, 'index'])
+            ->name('words');
+        Route::post('/words/{word}/occurrence', [\App\Http\Controllers\ZabanAdminWordsController::class, 'saveOccurrence'])
+            ->whereNumber('word')->name('words.occ.save');
+        Route::post('/words/occurrence/{id}', [\App\Http\Controllers\ZabanAdminWordsController::class, 'destroyOccurrence'])
+            ->whereNumber('id')->name('words.occ.delete');
 
         Route::get('/content',       [ZabanAdminController::class, 'content'])->name('content');
         Route::post('/content/bump', [ZabanAdminController::class, 'bump'])->name('content.bump');

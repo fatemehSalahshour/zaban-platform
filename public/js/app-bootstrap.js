@@ -31,7 +31,32 @@ window.ZABAN = (function () {
   }
 
   /** اگر کوکی نبود یا منقضی شده بود، یک بار تازه‌اش می‌کنیم. */
+  /** توکن خام تازه از سرور — برای هدر X-CSRF-TOKEN */
+  async function freshCsrf() {
+    try {
+      const r = await fetch('/csrf', { credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' } });
+      if (r.ok) {
+        const j = await r.json();
+        if (j && j.token) return j.token;
+      }
+    } catch (_) {}
+    return '';
+  }
+
   async function freshXsrf() {
+    /* اول مسیر خودمان: توکن را مستقیم برمی‌گرداند و کوکی XSRF-TOKEN را هم
+       تازه می‌کند. تکیه بر /sanctum/csrf-cookie کافی نبود — کوکی گاهی
+       به‌روز نمی‌شد و تلاش دوم هم ۴۱۹ می‌گرفت. */
+    try {
+      const r = await fetch('/csrf', { credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' } });
+      if (r.ok) {
+        const j = await r.json();
+        if (j && j.token) return j.token;
+      }
+    } catch (_) {}
+
     try { await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' }); } catch (_) {}
     return xsrf();
   }
@@ -64,8 +89,27 @@ window.ZABAN = (function () {
                       'X-Requested-With': 'XMLHttpRequest' };
     if (OBF_KEY) headers['X-Zaban-Obf'] = '1';
     if (method !== 'GET') {
-      const t = xsrf() || await freshXsrf();
-      if (t) headers['X-XSRF-TOKEN'] = t;
+      /* در تلاش دوم حتماً توکن تازه می‌گیریم.
+         قبلاً `xsrf() || await freshXsrf()` بود: وقتی نشست عوض می‌شود
+         (ورود به حساب کاربر، خروج، یا انقضای دو ساعته) کوکی هنوز سر جایش
+         است ولی دیگر معتبر نیست — پس شرط اول جواب می‌داد، توکن باطل دوباره
+         فرستاده می‌شد و تلاش دوم هم ۴۱۹ می‌گرفت. */
+      /* دو هدر متفاوت با دو نوع مقدار:
+           X-XSRF-TOKEN  → مقدار رمزشده‌ی کوکی
+           X-CSRF-TOKEN  → توکن خام (همانی که /csrf می‌دهد)
+         قبلاً توکن خام در هدر رمزشده فرستاده می‌شد؛ لاراول نمی‌توانست
+         رمزگشایی‌اش کند و تلاش دوم هم ۴۱۹ می‌گرفت. */
+      const plain = retried ? await freshCsrf() : '';
+      if (plain) {
+        headers['X-CSRF-TOKEN'] = plain;
+      } else {
+        const t = xsrf();
+        if (t) headers['X-XSRF-TOKEN'] = t;
+        else {
+          const p = await freshCsrf();
+          if (p) headers['X-CSRF-TOKEN'] = p;
+        }
+      }
     }
 
     const res = await fetch(API + path, {
@@ -95,6 +139,29 @@ window.ZABAN = (function () {
     /* ۴۱۹ = توکن CSRF منقضی شده (سشن طولانی، تب باز مانده).
        یک بار توکن را تازه می‌کنیم و همان درخواست را می‌فرستیم. */
     if (res.status === 419 && !retried) return req(method, path, body, true);
+
+    /* اگر با توکن تازه هم رد شد، یعنی نشست واقعاً از بین رفته (مثلاً مدیر
+       از حساب کاربر بیرون آمده و این تب جا مانده). پیام روشن بهتر از
+       «اتصال را بررسی کنید» است، که کاربر را دنبال اینترنتش می‌فرستد. */
+    if (res.status === 419) {
+      /* یک بار خودکار نوسازی می‌کنیم — نشانه در sessionStorage جلوی حلقه را
+         می‌گیرد اگر نوسازی هم حلش نکرد. */
+      let looped = false;
+      try { looped = sessionStorage.getItem('zaban_csrf_reload') === '1'; } catch (_) {}
+
+      if (!looped) {
+        try { sessionStorage.setItem('zaban_csrf_reload', '1'); } catch (_) {}
+        location.reload();
+        throw halt('csrf_reload');
+      }
+
+      fatal('نشست شما تازه شده است. صفحه را یک بار نوسازی کنید (Ctrl+F5).');
+      throw halt('csrf_expired');
+    }
+
+    /* درخواست موفق یعنی توکن سالم است — نشانه‌ی نوسازی پاک می‌شود تا دفعه‌ی
+       بعد هم یک بار خودکار نوسازی مجاز باشد. */
+    if (res.ok) { try { sessionStorage.removeItem('zaban_csrf_reload'); } catch (_) {} }
 
     if (res.status === 423) {
       /* حساب به‌خاطر الگوی غیرعادی استفاده موقتاً قفل است (AbuseGuard) */
@@ -540,7 +607,30 @@ window.ZABAN = (function () {
       '<div style="font-size:17px;font-weight:700;margin-bottom:8px">دسترسی «' + name + '» فعال نیست</div>' +
       '<div style="font-size:14px;color:#5b6167;line-height:2;margin-bottom:16px">' +
       'برای استفاده از کلمات و آزمون‌های این رشته، پکیجش را تهیه کنید.</div>' +
-      '<a class="deckbtn" href="' + url + '" style="display:inline-block;text-decoration:none">مشاهده‌ی پکیج‌ها</a></div>';
+      '<a class="deckbtn" href="' + url + '" style="display:inline-block;text-decoration:none">مشاهده‌ی پکیج‌ها</a>' +
+      '<button type="button" data-pw-close="1" style="display:block;margin:14px auto 0;background:none;' +
+      'border:0;font:inherit;font-size:13px;color:#6b7787;cursor:pointer;text-decoration:underline;' +
+      'text-underline-offset:3px">بستن</button>' +
+      '<button type="button" data-pw-close="1" aria-label="بستن" style="position:absolute;top:10px;' +
+      'left:12px;background:none;border:0;font-size:20px;line-height:1;color:#8a929b;cursor:pointer">×</button>' +
+      '</div>';
+
+    /* بدون این، پنجره هیچ راه بستنی نداشت و کاربر در همان صفحه گیر می‌کرد.
+       سه راه، چون هر کسی یکی‌شان را امتحان می‌کند: دکمه، کلیک بیرون، Esc. */
+    el.querySelector('.sheet').style.position = 'relative';
+
+    function close() {
+      el.remove();
+      paywallOpen = false;
+      document.removeEventListener('keydown', onKey);
+    }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+
+    el.addEventListener('click', function (e) {
+      if (e.target === el || e.target.closest('[data-pw-close]')) close();
+    });
+    document.addEventListener('keydown', onKey);
+
     document.body.appendChild(el);
   }
 

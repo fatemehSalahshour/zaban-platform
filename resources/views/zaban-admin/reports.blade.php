@@ -17,11 +17,30 @@
      روی همان دکمه‌ی ⚑ و در «گزارش‌های من» به کاربر نشان داده می‌شود.</p>
 </div>
 
+@php
+  /* فیلترها روی هم جمع می‌شوند؛ هر لینک بقیه را نگه می‌دارد */
+  $url = fn (array $over) => '?' . http_build_query(array_filter(
+      array_merge(['state' => $state, 'topic' => $topic, 'kind' => $kind], $over)));
+@endphp
+
 <nav class="tabs">
   @foreach ($tabs as $k => $t)
-    <a href="?state={{ $k }}" class="{{ $state === $k ? 'on' : '' }}">
+    <a href="{{ $url(['state' => $k]) }}" class="{{ $state === $k ? 'on' : '' }}">
       {{ $t }}@if ($k !== 'all') <span class="n">{{ $counts[$k] }}</span>@endif
     </a>
+  @endforeach
+</nav>
+
+<nav class="tabs sub">
+  <a href="{{ $url(['kind' => null]) }}" class="{{ $kind === '' ? 'on' : '' }}">کلمه و سؤال</a>
+  <a href="{{ $url(['kind' => 'w']) }}" class="{{ $kind === 'w' ? 'on' : '' }}">فقط کلمه‌ها</a>
+  <a href="{{ $url(['kind' => 'q']) }}" class="{{ $kind === 'q' ? 'on' : '' }}">فقط سؤال‌ها</a>
+</nav>
+
+<nav class="tabs sub">
+  <a href="{{ $url(['topic' => null]) }}" class="{{ $topic === '' ? 'on' : '' }}">همه‌ی موضوع‌ها</a>
+  @foreach ($topics as $t)
+    <a href="{{ $url(['topic' => $t]) }}" class="{{ $topic === $t ? 'on' : '' }}">{{ $t }}</a>
   @endforeach
 </nav>
 
@@ -64,6 +83,7 @@
     @if ($state === 'open') گزارشی در انتظار پاسخ نیست.
     @elseif ($state === 'answered') هنوز به گزارشی پاسخ نداده‌اید.
     @else هنوز هیچ کاربری گزارشی نفرستاده. @endif
+    @if ($topic !== '' || $kind !== '') <br><small>فیلتر فعال است؛ با برداشتن آن ممکن است گزارش‌های دیگری باشد.</small>@endif
   </div></div>
 @endforelse
 
@@ -80,6 +100,9 @@
   .tabs a{padding:6px 14px;border:1px solid var(--line-2);border-radius:20px;background:var(--panel);
           font-size:13px;color:var(--ink-2)}
   .tabs a.on{border-color:var(--ink);background:var(--ink);color:#fff}
+  .tabs.sub{margin-top:-8px}
+  .tabs.sub a{font-size:12.5px;padding:4px 11px}
+  .tabs.sub a.on{background:var(--gold,#b8892b);border-color:var(--gold,#b8892b)}
   .tabs .n{font-weight:700;font-variant-numeric:tabular-nums;margin-right:2px}
   .rep.is-open{border-right:3px solid var(--danger)}
   .rep-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}

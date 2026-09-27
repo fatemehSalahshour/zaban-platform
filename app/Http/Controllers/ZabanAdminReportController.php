@@ -18,10 +18,21 @@ class ZabanAdminReportController extends Controller
             $state = 'open';
         }
 
+        /* فیلتر موضوع — با زیاد شدن گزارش‌ها، دیدن «همه‌ی معنی‌های نادرست»
+           یا «همه‌ی کلمه‌هایی که در تست نیستند» یک کار جداست. */
+        $topic = (string) $req->query('topic', '');
+        if (!in_array($topic, ZabanReportController::TOPICS, true)) $topic = '';
+
+        /* فیلتر نوع: کلمه یا سؤال */
+        $kind = $req->query('kind', '');
+        if (!in_array($kind, ['w', 'q'], true)) $kind = '';
+
         $q = DB::table('reports')->orderByDesc('last_msg_at')->orderByDesc('id');
         if ($state !== 'all') {
             $q->where('state', $state);
         }
+        if ($topic !== '') $q->where('topic', $topic);
+        if ($kind !== '')  $q->where('item_key', 'like', $kind . ':%');
         $reports = $q->paginate(20)->withQueryString();
 
         $ids  = $reports->getCollection()->pluck('id');
@@ -41,6 +52,9 @@ class ZabanAdminReportController extends Controller
             'reports' => $reports,
             'msgs'    => $msgs,
             'state'   => $state,
+            'topic'   => $topic,
+            'kind'    => $kind,
+            'topics'  => ZabanReportController::TOPICS,
             'who'     => $who,
             'counts'  => [
                 'open'     => (int) ($counts['open'] ?? 0),

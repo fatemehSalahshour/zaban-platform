@@ -113,7 +113,7 @@ class ImpersonateController extends Controller
             'seconds'   => time() - (int) ($stash['started_at'] ?? time()),
         ]);
 
-        return redirect()->route('zaban.admin.users');
+        return redirect()->route('zadmin.users');
     }
 
     /**
@@ -128,13 +128,19 @@ class ImpersonateController extends Controller
         $user = Auth::user();
         $name = e($user?->name ?: $user?->mobile ?: ('#' . Auth::id()));
         $back = e(route('impersonate.stop'));
+        /* مسیر خروج POST است؛ لینک ساده ۴۰۵ می‌گرفت. */
+        $csrf = csrf_field();
 
         return <<<HTML
 <div id="impersonate-bar" style="position:fixed;top:0;left:0;right:0;z-index:2147483647;
      background:#b91c1c;color:#fff;padding:9px 14px;text-align:center;
      font:14px/1.9 inherit;box-shadow:0 2px 8px rgba(0,0,0,.3)">
   شما به‌عنوان مدیر در حساب <b>{$name}</b> (شناسه {$user?->id}) هستید.
-  <a href="{$back}" style="color:#fff;text-decoration:underline;font-weight:700;margin-right:8px">بازگشت به حساب خودم</a>
+  <form method="post" action="{$back}" style="display:inline;margin-right:8px">
+    {$csrf}
+    <button type="submit" style="background:none;border:0;color:#fff;text-decoration:underline;
+            font:inherit;font-weight:700;cursor:pointer;padding:0">بازگشت به حساب خودم</button>
+  </form>
 </div>
 <script>document.documentElement.style.scrollPaddingTop='48px';document.body.style.paddingTop='42px';</script>
 HTML;

@@ -121,11 +121,13 @@ class ZabanAdminController extends Controller
             'version'   => $pricing->version(),
             /* نمایش به شمسی؛ ذخیره میلادی */
             'examDate'  => \App\Support\Jalali::formatFromGregorian($pricing->accessUntil()),
-            'demoYear'  => $ent->demoYear(),
+            'trialOn'   => $ent->trialOn(),
+            'trialCap'  => $ent->trialCap(),
+            'trialBooks'=> $ent->trialBooklets(),
             'sec'       => app(\App\Services\Security\Settings::class)->all(),
             'newPerDay' => app(\App\Services\Security\Settings::class)->newPerDay(),
             'secFields' => \App\Services\Security\Settings::FIELDS,
-            'demoExams' => $ent->demoExamsSetting(),
+
             'qCount'    => $qCount,
         ]);
     }
@@ -133,12 +135,14 @@ class ZabanAdminController extends Controller
     public function saveSettings(Request $req, Pricing $pricing, \App\Services\Entitlements $ent): RedirectResponse
     {
         $data = $req->validate([
-            'demo_year'    => ['nullable', 'integer', 'min:1380', 'max:1420'],
+            /* نسخه‌ی آزمایشی: سقف کلمه و دفترچه‌هایی که آزمون کاملشان باز است */
+            'trial_on'        => ['nullable'],
+            'trial_cap'       => ['nullable', 'integer', 'min:0', 'max:5000'],
+            'trial_books'     => ['nullable', 'array', 'max:6'],
+            'trial_books.*'   => ['nullable', 'string', 'max:12'],
             'sec'          => ['nullable', 'array'],
             'sec.*'        => ['nullable', 'integer'],     /* کمینه/بیشینه را Settings::save اعمال می‌کند */
             'new_per_day'  => ['nullable', 'integer'],
-            'demo_exams'   => ['nullable', 'array'],
-            'demo_exams.*' => ['in:ce,it,cs'],
             'p1' => ['required', 'integer', 'min:0', 'max:100000000'],
             'p2' => ['required', 'integer', 'min:0', 'max:100000000'],
             'p3' => ['required', 'integer', 'min:0', 'max:100000000'],
@@ -149,7 +153,15 @@ class ZabanAdminController extends Controller
 
         $pricing->saveBundles([1 => $data['p1'], 2 => $data['p2'], 3 => $data['p3']]);
 
-        $ent->saveDemo(isset($data['demo_year']) ? (int) $data['demo_year'] : null, $data['demo_exams'] ?? []);
+        /* «1404:ce» → ['year' => 1404, 'exam' => 'ce'] */
+        $books = [];
+        foreach ($data['trial_books'] ?? [] as $pair) {
+            [$y, $e] = array_pad(explode(':', (string) $pair), 2, null);
+            if (is_numeric($y) && in_array($e, ['ce', 'it', 'cs'], true)) {
+                $books[] = ['year' => (int) $y, 'exam' => $e];
+            }
+        }
+        $ent->saveTrial($req->boolean('trial_on'), (int) ($data['trial_cap'] ?? 200), $books);
 
         /* امنیت محتوا — هر عدد بین کمینه و بیشینه‌ی خودش نگه داشته می‌شود (Settings::FIELDS) */
         app(\App\Services\Security\Settings::class)->save(array_filter($data['sec'] ?? [], fn ($v) => $v !== null),

@@ -471,6 +471,7 @@
         <button data-topic="گزینه اشتباه">گزینه اشتباه</button>
         <button data-topic="معنی نادرست">معنی نادرست</button>
         <button data-topic="فاقد جواب تشریحی">فاقد جواب تشریحی</button>
+        <button data-topic="این کلمه در این تست نیست">این کلمه در این تست نیست</button>
         <button data-topic="سایر">سایر</button>
       </div>
 
@@ -554,6 +555,12 @@
 {{-- کد صفحه در public/js/zaban/app.js (جدا کردن کد، قدم ۳). نسخه خودکار از زمان
      تغییر فایل؛ مرورگر آن را جدا از HTML کش می‌کند. --}}
 <script src="/js/zaban/app.js?v={{ filemtime(public_path('js/zaban/app.js')) }}"></script>
+{{-- نوار «شما در حساب کاربر هستید» — تنها راه برگشت به حساب مدیر.
+     متد banner() نوشته شده بود ولی هیچ‌جا صدا زده نمی‌شد، پس مدیر پس از
+     ورود به حساب کاربر راه برگشتی روی صفحه نداشت. --}}
+@if (session()->has(\App\Http\Controllers\ImpersonateController::KEY))
+  {!! \App\Http\Controllers\ImpersonateController::banner() !!}
+@endif
 </body>
 </html>
 

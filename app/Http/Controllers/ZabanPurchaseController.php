@@ -56,7 +56,10 @@ class ZabanPurchaseController extends Controller
             'orders'  => DB::table('zaban_orders')->where('user_id', $uid)->whereNotNull('token')
                 ->orderByDesc('id')->limit(30)
                 ->get(['id', 'status', 'exams', 'payable', 'rrn', 'gateway_code', 'created_at', 'paid_at']),
-            'demo'    => ($dy = $this->ent->demoYear()) ? ['year' => $dy, 'exams' => $this->ent->demoExams($uid)] : null,
+            'trial'   => app(\App\Services\Security\TrialQuota::class)->applies($uid)
+                ? ['remaining' => app(\App\Services\Security\TrialQuota::class)->remaining($uid),
+                   'cap'       => $this->ent->trialCap()]
+                : null,
             'pre'     => array_values(array_diff(array_intersect($pre, array_keys(Pricing::NAMES)), $owned)),
             'bundles' => $this->pricing->bundles(),
             'until'   => $this->pricing->accessUntil(),

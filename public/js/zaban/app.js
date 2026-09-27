@@ -564,6 +564,8 @@ function renderWord(w){
        <button class="deckbtn" style="flex:1" data-toggle="${w.w}">${deck.has(w.w)?"حذف از دک مرور":"افزودن به دک مرور"}</button>
        <button class="ghost" data-star="${w.w}">${star.has(w.w)?"★ حذف از منتخب":"☆ افزودن به منتخب"}</button>
        <button class="ghost" data-note="w:${w.w}" data-nt="یادداشت — ${w.w}">${nHas("w:"+w.w)?"✎ ویرایش یادداشت":"✎ یادداشت"}</button>
+       <button class="ghost ${rAnswered("w:"+w.w)?"on":""}" data-rep="w:${w.w}"
+               data-rt="${w.w} — ${w.fa}">⚑ ${rAnswered("w:"+w.w)?"پاسخ داده شد":(rHas("w:"+w.w)?"گزارش ثبت شده":"گزارش اشکال")}</button>
      </div>
      ${nBox("w:"+w.w)}
    </header>
@@ -1141,7 +1143,10 @@ function buildText(y,e,sec,p){
   const k=textKeyOf(y,e,sec,p);
   if(_txtCache[k]!==undefined)return _txtCache[k];
   const t=(typeof TEXTS!=="undefined"&&TEXTS)?TEXTS[k]:null;
-  return _txtCache[k] = t ? (typeof t==="string"?t:(t.body||"")) : "";
+  /* سرور متن را با کلید en می‌فرستد (ContentBuilder::texts)، نه body.
+     تا وقتی اینجا فقط body خوانده می‌شد، متن پسیج و کلوز هیچ‌وقت
+     نمایش داده نمی‌شد و پنجره بدون متن باز می‌ماند. */
+  return _txtCache[k] = t ? (typeof t==="string" ? t : (t.en||t.body||"")) : "";
 }
 function textBlock(y,e,sec,p){
   const body=buildText(y,e,sec,p);
@@ -1163,8 +1168,12 @@ function renderText(y,e,sec,p){
      <div class="capt">کلمات هایلایت‌شده در بانک ثبت شده‌اند؛ روی هرکدام بزنید تا معنی و تاریخچه‌اش باز شود.</div></section>
    ${g?`<section><div class="label">سؤال‌های این ${sec==="پسیج"?"پسیج":"کلوز"}</div>
      <div class="kin">${Array.from({length:g[4]-g[3]+1},(_,i)=>g[3]+i).map(q=>`<span data-goq="${y}|${e}|${q}" style="cursor:pointer">تست ${fa(q)}</span>`).join("")}</div></section>`:""}
-   <section><div class="label">کلمات این متن</div>
-     <div class="kin">${ws.map(w=>`<span class="en" data-w="${w.w}" style="cursor:pointer">${w.w}</span>`).join("")}</div></section>`;
+   <section><div class="label">کلمات این متن <span class="cnt">${fa(ws.length)}</span></div>
+     <div class="twords">${ws.slice().sort((a,b)=>a.w.localeCompare(b.w)).map(w=>{
+        const m=MEANS[WID[w.w]]||"";
+        return `<button class="tw" data-w="${w.w}">
+          <bdi class="en">${w.w}</bdi><span class="fa">${m||"…"}</span></button>`;
+      }).join("")}</div></section>`;
   $("#detail").classList.remove("open");$("#qview").classList.add("open");
 }
 

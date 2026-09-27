@@ -21,6 +21,9 @@
   .own:last-child{border-bottom:0}
   .own small{color:var(--ink-3);font-size:12.5px}
   .demo-row small{color:#8f6d1f}
+  .backlink{display:inline-block;margin-bottom:10px;font-size:13.5px;color:#6b7787;
+    text-decoration:none}
+  .backlink:hover{color:#16191d}
   .pay{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 0;border-bottom:1px dashed var(--line);
        font-size:13.5px;text-decoration:none;color:inherit}
   .pay:last-child{border-bottom:0}
@@ -35,7 +38,8 @@
 @endpush
 
 @section('body')
-  <h1>خرید و پرداخت‌ها</h1>
+  <a class="backlink" data-back-platform href="{{ route('zaban') }}">→ بازگشت به پلتفرم</a>
+<h1>خرید و پرداخت‌ها</h1>
   <p class="sub">رشته‌های فعال، خرید رشته‌ی تازه و سابقه‌ی پرداخت‌های شما.</p>
 
   <h2>رشته‌های شما</h2>
@@ -46,11 +50,12 @@
   @empty
     <div class="empty">هنوز رشته‌ای نخریده‌اید.</div>
   @endforelse
-  @if ($demo && $demo['exams'])
-    @foreach ($demo['exams'] as $d)
-      <div class="own demo-row"><span>{{ $names[$d] ?? $d }}</span>
-        <small>نسخه‌ی نمایشی — فقط کنکور {{ $demo['year'] }}</small></div>
-    @endforeach
+  {{-- نسخه‌ی آزمایشی: همه‌ی سال‌ها دیده می‌شود، فقط عمق سهمیه دارد --}}
+  @if ($trial)
+    <div class="own demo-row">
+      <span>نسخه‌ی آزمایشی</span>
+      <small>{{ $trial['remaining'] }} کلمه از {{ $trial['cap'] }} باقی مانده</small>
+    </div>
   @endif
 
   <h2>خرید رشته</h2>
@@ -80,7 +85,9 @@
     @endif
     <button class="btn" id="pay" type="submit" disabled>پرداخت</button>
     <p class="note">پرداخت از درگاه امن ایران کیش (شاپرک)
-      @if ($until)· دسترسی تا {{ \Illuminate\Support\Carbon::parse($until)->format('Y/m/d') }} @endif</p>
+      {{-- تاریخ میلادی برای کاربر ایرانی بی‌معناست؛ همه‌جای پلتفرم شمسی است --}}
+      @if ($until)· دسترسی تا {{ str_replace('-', '/', \App\Support\Jalali::formatFromGregorian(
+          \Illuminate\Support\Carbon::parse($until)->format('Y-m-d'))) }} @endif</p>
   </form>
 
   <h2>پرداخت‌های من</h2>

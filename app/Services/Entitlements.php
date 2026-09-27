@@ -97,22 +97,111 @@ class Entitlements
      */
     /* =================================================================
      |  نسخه‌ی نمایشی (دمو)
-     |  مدیر در پنل یک سال (مثلاً ۱۴۰۵) و رشته‌های پیش‌فرض را انتخاب می‌کند.
-     |  کاربری که رشته‌ای را نخریده، محتوای همان یک سالِ آن رشته را دارد.
-     |  رشته‌های دمو: اگر کاربر در پروفایل رشته‌ای انتخاب کرده که نخریده،
-     |  فقط همان؛ وگرنه رشته‌های انتخاب‌شده‌ی مدیر. خرید یک رشته، دموی
-     |  رشته‌های دیگر را برنمی‌دارد. محدودیت زمانی ندارد.
+     |  نسخه‌ی آزمایشی «پهنا باز، عمق سهمیه‌ای»:
+     |
+     |  کاربری که رشته‌ای را نخریده، همه‌ی سال‌های آن رشته را می‌بیند — فهرست
+     |  کلمه‌ها، نوار سال‌ها، جدول «کجا در کنکور آمده»، پوشش بانک و پیش‌بینی.
+     |  یعنی قابلیت‌های پلتفرم را کامل لمس می‌کند.
+     |
+     |  آنچه محدود است «عمق» است نه «پهنا»:
+     |    · معنی و مثال‌ها → تا سقف مشخصی کلمه‌ی متمایز (پیش‌فرض ۲۰۰)
+     |    · پاسخ و تشریح و آزمون دادن → فقط روی دفترچه‌های آزمایشی مدیر
+     |
+     |  چرا این‌طور: نسخه‌ی قبلی یک سال را باز می‌گذاشت، ولی آن وقت نوار
+     |  سال‌ها و جدول ظهور خالی می‌ماندند و کاربر فکر می‌کرد پلتفرم این
+     |  قابلیت‌ها را ندارد — یعنی دمو دقیقاً همان چیزی را پنهان می‌کرد که
+     |  باید می‌فروخت.
+     |
+     |  سقف بر «کلمه‌ی متمایز» است نه بر کلیک: کلمه‌ای که یک بار باز شده،
+     |  هر بار دیگر رایگان است. وگرنه کاربر از کلیک کردن می‌ترسد.
      * ================================================================= */
 
+    public const K_TRIAL_ON    = 'trial_on';
+    public const K_TRIAL_CAP   = 'trial_word_cap';
+    public const K_TRIAL_BOOKS = 'trial_booklets';   /* «1404:ce,1404:it» */
+
+    /* کلیدهای قدیمی — فقط برای پاک کردن کش نسخه‌های پیشین */
     public const K_DEMO_YEAR  = 'demo_year';
     public const K_DEMO_EXAMS = 'demo_exams';
 
-    /** سال دمو یا null اگر خاموش است */
+    /** نسخه‌ی آزمایشی روشن است؟ */
+    public function trialOn(): bool
+    {
+        return (bool) Cache::remember('zaban.trial.on', 60, fn () =>
+            DB::table('zaban_meta')->where('k', self::K_TRIAL_ON)->value('v'));
+    }
+
+    /** سقف کلمه‌ی متمایز در نسخه‌ی آزمایشی */
+    public function trialCap(): int
+    {
+        $v = Cache::remember('zaban.trial.cap', 60, fn () =>
+            DB::table('zaban_meta')->where('k', self::K_TRIAL_CAP)->value('v'));
+        return max(0, (int) ($v ?: 200));
+    }
+
+    /**
+     * دفترچه‌های آزمایشی: [['year' => 1404, 'exam' => 'ce'], …]
+     * روی این‌ها کاربر می‌تواند آزمون کامل بدهد و پاسخ و تشریح ببیند.
+     */
+    public function trialBooklets(): array
+    {
+        $v = (string) Cache::remember('zaban.trial.books', 60, fn () =>
+            DB::table('zaban_meta')->where('k', self::K_TRIAL_BOOKS)->value('v'));
+
+        $out = [];
+        foreach (array_filter(explode(',', $v)) as $pair) {
+            [$y, $e] = array_pad(explode(':', trim($pair)), 2, null);
+            if (is_numeric($y) && in_array($e, self::EXAMS, true)) {
+                $out[] = ['year' => (int) $y, 'exam' => $e];
+            }
+        }
+        return $out;
+    }
+
+    public function saveTrial(bool $on, int $cap, array $booklets): void
+    {
+        $pairs = [];
+        foreach ($booklets as $b) {
+            $y = (int) ($b['year'] ?? 0); $e = $b['exam'] ?? '';
+            if ($y > 0 && in_array($e, self::EXAMS, true)) $pairs[] = $y . ':' . $e;
+        }
+
+        foreach ([
+            self::K_TRIAL_ON    => $on ? '1' : '',
+            self::K_TRIAL_CAP   => (string) max(0, $cap),
+            self::K_TRIAL_BOOKS => implode(',', array_unique($pairs)),
+        ] as $k => $v) {
+            DB::table('zaban_meta')->updateOrInsert(['k' => $k], ['v' => $v, 'updated_at' => now()]);
+        }
+
+        foreach (['on', 'cap', 'books'] as $c) Cache::forget('zaban.trial.' . $c);
+    }
+
+    /** آیا این کاربر روی این رشته در حالت آزمایشی است؟ (یعنی نخریده) */
+    public function isTrial(int $userId, string $exam): bool
+    {
+        return $this->trialOn() && !$this->has($userId, $exam);
+    }
+
+    /**
+     * آیا می‌تواند پاسخ ببیند یا آزمون بدهد؟
+     * خریدار همیشه؛ کاربر آزمایشی فقط روی دفترچه‌های آزمایشی.
+     */
+    public function canAnswer(int $userId, string $exam, int $year): bool
+    {
+        if ($this->has($userId, $exam)) return true;
+        if (!$this->trialOn()) return false;
+
+        foreach ($this->trialBooklets() as $b) {
+            if ($b['exam'] === $exam && $b['year'] === $year) return true;
+        }
+        return false;
+    }
+
+    /** سال دمو — نسخه‌ی قدیمی، دیگر استفاده نمی‌شود */
     public function demoYear(): ?int
     {
-        $v = Cache::remember('zaban.demo.year', 60, fn () =>
-            DB::table('zaban_meta')->where('k', self::K_DEMO_YEAR)->value('v'));
-        return is_numeric($v) && (int) $v > 0 ? (int) $v : null;
+        return null;
     }
 
     /** رشته‌هایی که مدیر برای دمو انتخاب کرده (وقتی کاربر رشته‌ای انتخاب نکرده) */
@@ -134,15 +223,11 @@ class Entitlements
     }
 
     /** رشته‌هایی که این کاربر به‌صورت دمو دارد (هیچ‌کدام خریده‌شده نیست) */
+    /** رشته‌هایی که این کاربر نخریده و در حالت آزمایشی می‌بیند */
     public function demoExams(int $userId): array
     {
-        if (!$this->demoYear()) return [];
-        $owned = $this->for($userId);
-        $pref  = DB::table('zaban_profiles')->where('user_id', $userId)->value('exam');
-        $list  = ($pref && in_array($pref, self::EXAMS, true) && !in_array($pref, $owned, true))
-            ? [$pref]
-            : $this->demoExamsSetting();
-        return array_values(array_diff($list, $owned));
+        if (!$this->trialOn()) return [];
+        return array_values(array_diff(self::EXAMS, $this->for($userId)));
     }
 
     /**
@@ -154,8 +239,10 @@ class Entitlements
     public function scope(int $userId, string $exam): int|null|false
     {
         if ($this->has($userId, $exam)) return null;
-        $y = $this->demoYear();
-        return ($y && in_array($exam, $this->demoExams($userId), true)) ? $y : false;
+
+        /* آزمایشی: مرورِ همه‌ی سال‌ها باز است. محدودیت در «عمق» است و لایه‌ی
+           سهمیه اعمالش می‌کند، نه اینجا. */
+        return $this->trialOn() ? null : false;
     }
 
     /** آیا این کاربر به یک سؤال/کاربرد مشخص (رشته + سال) دسترسی دارد؟ */
@@ -172,13 +259,14 @@ class Entitlements
     public function scopeQuery($query, int $userId, string $examCol = 'exam', string $yearCol = 'year')
     {
         $owned = $this->for($userId);
-        $demo  = $this->demoExams($userId);
-        $y     = $this->demoYear();
 
-        return $query->where(function ($w) use ($owned, $demo, $y, $examCol, $yearCol) {
+        /* در حالت آزمایشی هیچ محدودیت سالی نیست — همه‌چیز دیده می‌شود و
+           عمق را سهمیه کنترل می‌کند. */
+        if ($this->trialOn()) return $query;
+
+        return $query->where(function ($w) use ($owned, $examCol) {
             $w->whereRaw('1 = 0');
             if ($owned) $w->orWhereIn($examCol, $owned);
-            if ($demo && $y) $w->orWhere(fn ($d) => $d->whereIn($examCol, $demo)->where($yearCol, $y));
         });
     }
 

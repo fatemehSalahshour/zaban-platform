@@ -51,33 +51,40 @@
   </div>
 
   <div class="panel">
-    <h3>نسخه‌ی نمایشی (دمو)</h3>
-    <p>کاربری که رشته‌ای را نخریده، به‌جای پیام «دسترسی فعال نیست» همه‌ی امکانات
-       یک سال از آن رشته را رایگان دارد: کلمات، تست‌ها با پاسخ و تشریحی، آزمون آزمایشی،
-       مرور و یادداشت. محتوای سال‌های دیگر اصلاً برایش فرستاده نمی‌شود.</p>
+    <h3>نسخه‌ی آزمایشی</h3>
+    <p>کاربری که رشته‌ای را نخریده <b>همه‌ی سال‌ها و رشته‌ها را می‌بیند</b>: فهرست کلمه‌ها،
+       نوار سال‌ها، جدول «کجا در کنکور آمده»، پوشش بانک و پیش‌بینی. یعنی قابلیت‌های
+       پلتفرم را کامل لمس می‌کند.</p>
+    <p>آنچه محدود است «عمق» است: معنی و مثال تا سقف مشخصی <b>کلمه‌ی متمایز</b>، و
+       پاسخ و آزمون فقط روی دفترچه‌هایی که پایین انتخاب می‌کنید.</p>
+    <p><i>سقف روی کلمه‌ی متمایز است نه کلیک — کلمه‌ای که یک بار باز شده، هر بار
+       دیگر رایگان است. وگرنه کاربر از کلیک کردن می‌ترسد.</i></p>
 
     <div class="field">
-      <label for="demo_year">سال دمو
-        <i>عددها: تعداد سؤال وارد‌شده در کامپیوتر / آی‌تی / علوم</i></label>
-      <select id="demo_year" name="demo_year">
-        <option value="">خاموش — بدون دمو</option>
-        @foreach ($qCount as $y => $c)
-          <option value="{{ $y }}" @selected((int) old('demo_year', $demoYear) === (int) $y)>
-            {{ $y }} — {{ $c['ce'] ?? 0 }} / {{ $c['it'] ?? 0 }} / {{ $c['cs'] ?? 0 }}
-            @if (!array_sum($c)) (هنوز سؤالی وارد نشده — فقط کلمات) @endif
-          </option>
-        @endforeach
-      </select>
+      <label><input type="checkbox" name="trial_on" value="1" @checked(old('trial_on', $trialOn))>
+        نسخه‌ی آزمایشی روشن باشد</label>
     </div>
 
     <div class="field">
-      <label>رشته‌های دمو
-        <i>برای کاربری که هنوز رشته‌ای در پروفایل انتخاب نکرده. اگر انتخاب کرده باشد،
-           فقط همان رشته دمو است. خرید یک رشته، دموی بقیه را برنمی‌دارد.</i></label>
+      <label for="trial_cap">سقف کلمه <i>پیش‌فرض ۲۰۰ · مجموع، نه روزانه</i></label>
+      <input type="number" id="trial_cap" name="trial_cap" dir="ltr" min="0" max="5000"
+             value="{{ old('trial_cap', $trialCap) }}">
+    </div>
+
+    <div class="field">
+      <label>دفترچه‌های آزمایشی
+        <i>روی این‌ها آزمون کامل و پاسخ و تشریحی باز است. دو تا کافی است.
+           عددها: تعداد سؤال وارد‌شده.</i></label>
       <div class="chk">
-        @foreach (\App\Services\Pricing::NAMES as $code => $name)
-          <label><input type="checkbox" name="demo_exams[]" value="{{ $code }}"
-                 @checked(in_array($code, old('demo_exams', $demoExams), true))> {{ $name }}</label>
+        @php $picked = collect(old('trial_books', array_map(fn ($b) => $b['year'] . ':' . $b['exam'], $trialBooks))); @endphp
+        @foreach ($qCount as $y => $c)
+          @foreach (\App\Services\Pricing::NAMES as $code => $name)
+            @if (($c[$code] ?? 0) > 0)
+              <label><input type="checkbox" name="trial_books[]" value="{{ $y }}:{{ $code }}"
+                     @checked($picked->contains($y . ':' . $code))>
+                {{ $y }} {{ $name }} <small>({{ $c[$code] }} سؤال)</small></label>
+            @endif
+          @endforeach
         @endforeach
       </div>
     </div>
@@ -140,7 +147,7 @@
   .chk-one input{accent-color:var(--gold);width:16px;height:16px}
   .chk label{display:flex;align-items:center;gap:6px;cursor:pointer}
   .chk input{accent-color:var(--gold);width:16px;height:16px}
-  select#demo_year{max-width:320px}
+  #trial_cap{max-width:160px}
   .ver{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);
        font-size:12.5px;color:var(--ink-3)}
 </style>

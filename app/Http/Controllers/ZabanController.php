@@ -131,8 +131,8 @@ class ZabanController extends Controller
 
         if (!$q) return response()->json(['error' => 'not_found'], 404);
 
-        // ۱) حق دسترسی: رشته‌ی خریده‌شده، یا سؤالِ سالِ دمو
-        if (!$this->ent->canItem($user->id, $q->exam, (int) $q->year)) {
+        // ۱) حق دسترسی: خریدار همه‌جا، آزمایشی فقط روی دفترچه‌های آزمایشی
+        if (!$this->ent->canAnswer($user->id, $q->exam, (int) $q->year)) {
             return response()->json([
                 'error' => 'not_entitled', 'exam' => $q->exam,
                 'message' => 'دسترسی این رشته فعال نیست.',
@@ -187,9 +187,12 @@ class ZabanController extends Controller
         }
 
         $uid = $req->user()->id;
-        /* فقط سؤال‌های رشته‌ی خریده‌شده یا سالِ دمو */
+        /* رشته‌ی خریده‌شده، یا دفترچه‌های آزمایشی. scopeQuery در حالت آزمایشی
+           همه‌چیز را می‌دهد (مرور باز است)، پس پاسخ‌ها جدا فیلتر می‌شوند. */
         $qs = $this->ent->scopeQuery(DB::table('questions')->whereIn('id', $ids), $uid)
-            ->get(['id', 'year', 'exam', 'correct_option', 'explanation']);
+            ->get(['id', 'year', 'exam', 'correct_option', 'explanation'])
+            ->filter(fn ($q) => $this->ent->canAnswer($uid, $q->exam, (int) $q->year))
+            ->values();
 
         $open = $this->openAttempt($uid);
         $out = []; $locked = []; $log = []; $ok = [];
@@ -296,7 +299,8 @@ class ZabanController extends Controller
         $uid = $req->user()->id;
         $q = DB::table('questions')->where('id', $id)->first(['id', 'year', 'exam', 'correct_option']);
         if (!$q) return response()->json(['error' => 'not_found'], 404);
-        if (!$this->ent->canItem($uid, $q->exam, (int) $q->year)) return response()->json(['error' => 'not_entitled'], 403);
+        /* پاسخ و تشریح: خریدار همه‌جا، آزمایشی فقط روی دفترچه‌های آزمایشی */
+        if (!$this->ent->canAnswer($uid, $q->exam, (int) $q->year)) return response()->json(['error' => 'not_entitled'], 403);
         if ($this->answerGate($uid, $q, $this->openAttempt($uid)) === null) {
             return response()->json(['error' => 'answer_locked'], 409);
         }
@@ -329,7 +333,8 @@ class ZabanController extends Controller
 
         $q = DB::table('questions')->where('id', $id)->first(['id', 'year', 'exam', 'correct_option']);
         if (!$q) return response()->json(['error' => 'not_found'], 404);
-        if (!$this->ent->canItem($uid, $q->exam, (int) $q->year)) return response()->json(['error' => 'not_entitled'], 403);
+        /* پاسخ و تشریح: خریدار همه‌جا، آزمایشی فقط روی دفترچه‌های آزمایشی */
+        if (!$this->ent->canAnswer($uid, $q->exam, (int) $q->year)) return response()->json(['error' => 'not_entitled'], 403);
         if ($this->answerGate($uid, $q, $this->openAttempt($uid)) === null) {
             return response()->json(['error' => 'answer_locked'], 409);
         }
@@ -353,6 +358,13 @@ class ZabanController extends Controller
         $uid = $req->user()->id;
 
         $ok = $this->filterEntitledItems($uid, 'word', $ids);
+
+        /* کیف نسخه‌ی آزمایشی پیش از سقف روزانه: کاربری که نخریده تا سقف
+           مجموع، کلمه‌ی متمایز باز می‌کند. برای خریدار بی‌اثر است. */
+        $tq = app(\App\Services\Security\TrialQuota::class)->filter($uid, $ok);
+        $trialBlocked = $tq['limited'];
+        $ok = $tq['allowed'];
+
         $qa = $this->wordQuota->allow($uid, $ok);
         if ($qa['fresh']) {
             DB::table('word_reveals')->insert(array_map(
@@ -365,8 +377,11 @@ class ZabanController extends Controller
         $sig = fn (array $pairs) => array_map(fn ($p) => [$this->wm->mark($uid, $p[0]), $this->wm->mark($uid, $p[1])], $pairs);
         return $this->obf($req, [
             'items'         => array_map(fn ($w) => ['id' => $w, 'ex' => $sig($ex[$w] ?? [])], $qa['allowed']),
-            'limited'       => $qa['limited'],
-            'limit_message' => $qa['limited'] ? $this->wordQuota->message() : null,
+            'limited'       => array_values(array_merge($qa['limited'], $trialBlocked)),
+            'limit_message' => $trialBlocked
+                ? app(\App\Services\Security\TrialQuota::class)->message()
+                : ($qa['limited'] ? $this->wordQuota->message() : null),
+            'trial_locked'  => (bool) $trialBlocked,
         ]);
     }
 
@@ -381,6 +396,11 @@ class ZabanController extends Controller
         $uid = $req->user()->id;
 
         $ok = $this->filterEntitledItems($uid, 'word', $ids);
+
+        $tq = app(\App\Services\Security\TrialQuota::class)->filter($uid, $ok);
+        $trialBlocked = $tq['limited'];
+        $ok = $tq['allowed'];
+
         $qa = $this->meaningQuota->allow($uid, $ok);
         if ($qa['fresh']) {
             DB::table('meaning_reveals')->insert(array_map(
@@ -392,8 +412,12 @@ class ZabanController extends Controller
         return $this->obf($req, [
             /* امضای نامرئی شماره‌ی کاربر در هر معنی */
             'items'         => array_map(fn ($w) => ['id' => $w, 'fa' => $this->wm->mark($uid, $fa[$w] ?? '')], $qa['allowed']),
-            'limited'       => $qa['limited'],
-            'limit_message' => $qa['limited'] ? $this->meaningQuota->message() : null,
+            'limited'       => array_values(array_merge($qa['limited'], $trialBlocked)),
+            'limit_message' => $trialBlocked
+                ? app(\App\Services\Security\TrialQuota::class)->message()
+                : ($qa['limited'] ? $this->meaningQuota->message() : null),
+            /* «آزمایشی» یعنی با خرید باز می‌شود؛ سقف روزانه یعنی فردا بیا */
+            'trial_locked'  => (bool) $trialBlocked,
         ]);
     }
 
@@ -548,9 +572,20 @@ class ZabanController extends Controller
                     })(),
                 'owned'    => $owned,
                 /* دمو: رشته‌هایی که نخریده ولی سالِ دموی آن‌ها باز است */
-                'demo'     => ($dy = $this->ent->demoYear())
-                    ? ['year' => $dy, 'exams' => $this->ent->demoExams($user->id)]
-                    : null,
+                /* نسخه‌ی آزمایشی: رشته‌هایی که نخریده، سهمیه‌ی باقی‌مانده، و
+                   دفترچه‌هایی که می‌تواند آزمون کامل بدهد. مرورگر از روی همین
+                   شمارنده‌ی «چند کلمه مانده» و دعوت به خرید را می‌سازد. */
+                'trial'    => (function () use ($user) {
+                    $tq = app(\App\Services\Security\TrialQuota::class);
+                    if (!$tq->applies($user->id)) return null;
+                    return [
+                        'exams'     => $this->ent->demoExams($user->id),
+                        'cap'       => $tq->cap(),
+                        'used'      => $tq->used($user->id),
+                        'remaining' => $tq->remaining($user->id),
+                        'booklets'  => $this->ent->trialBooklets(),
+                    ];
+                })(),
                 'show_in_board' => (bool) ($profile->show_in_board ?? true),
                 /* از حساب کاربر — فقط نمایش. موبایل فقط اگر ستونش باشد (بعد از SSO). */
                 'name'       => $user->name ?? null,
@@ -733,7 +768,7 @@ class ZabanController extends Controller
             'exam' => 'required|in:ce,it,cs',
             'position' => 'required|integer|min:0|max:2000',
         ]);
-        if (!$this->ent->canItem($req->user()->id, $d['exam'], (int) $d['year'])) {
+        if (!$this->ent->canAnswer($req->user()->id, $d['exam'], (int) $d['year'])) {
             return response()->json(['error' => 'not_entitled'], 403);
         }
         DB::table('reading_marks')->updateOrInsert(
@@ -867,8 +902,8 @@ class ZabanController extends Controller
         ]);
         $uid = $req->user()->id;
 
-        /* خریده، یا آزمونِ سالِ دمو */
-        if (!$this->ent->canItem($uid, $d['exam'], (int) $d['year'])) {
+        /* خریده، یا یکی از دفترچه‌های آزمایشی */
+        if (!$this->ent->canAnswer($uid, $d['exam'], (int) $d['year'])) {
             return response()->json(['error' => 'not_entitled', 'exam' => $d['exam'],
                                      'buy_url' => '/buy?exam=' . $d['exam']], 403);
         }

@@ -740,12 +740,15 @@ html[data-theme="dim"] .dashbtn.on,html[data-theme="dark"] .dashbtn.on{
    پس چشم می‌تواند یک ستون را عمودی بخواند. با چیپ اینلاین ممکن نبود. */
 .ex-ws{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));
   gap:7px;margin-top:11px}
-.ex-ws button{display:grid;grid-template-columns:minmax(0,auto) 1fr;align-items:baseline;
+.ex-ws button{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);align-items:baseline;
   column-gap:9px;text-align:right;background:var(--paper);border:1px solid var(--line);
   border-radius:9px;padding:8px 11px;transition:.13s;min-height:40px;position:relative}
 .ex-ws button:hover{border-color:var(--gold-line);background:var(--gold-soft)}
-.ex-ws button .en{font-size:13px;font-weight:600;direction:ltr;white-space:nowrap}
-.ex-ws button .fa{font-size:11.5px;color:var(--ink-3);direction:rtl;
+/* گزینه‌ها گاهی یک جمله‌ی کاملند نه یک کلمه. بدون min-width:0 و بریدن،
+   nowrap متن را از خانه بیرون می‌زد و روی ستون کناری می‌افتاد. */
+.ex-ws button .en{font-size:13px;font-weight:600;direction:ltr;white-space:nowrap;
+  min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ex-ws button .fa{font-size:11.5px;color:var(--ink-3);direction:rtl;min-width:0;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .ex-ws button .dk{position:absolute;left:9px;bottom:3px;font-size:9px;font-style:normal;
   color:var(--accent);opacity:.75}
@@ -1565,3 +1568,27 @@ html[data-theme="dark"] .showbtn:hover,html[data-theme="dim"] .showbtn:hover{bac
 /* پیام کوتاه: سطح تیره‌ی خوانا با متن روشن */
 html[data-theme="dark"] .toast,html[data-theme="dim"] .toast{
   background:#2a2f36;color:#f2efe9;border:1px solid var(--line-2)}
+
+/* کلمات یک پسیج — گاهی پنجاه‌تا. قبلاً با همان استایل «هم‌خانواده‌ها»
+   (چند تراشه‌ی کنار هم) نمایش داده می‌شد و با این تعداد به‌هم‌ریخته و
+   ناخوانا می‌شد: عرض‌های نابرابر، ترتیب راست‌به‌چپ، و بدون معنی.
+   حالا شبکه‌ی مرتب الفبایی، هر کلمه کنار معنی‌اش. */
+.twords{display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.twords .tw{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  align-items:baseline;column-gap:8px;text-align:right;background:var(--paper);
+  border:1px solid var(--line);border-radius:8px;padding:7px 10px;transition:.13s;cursor:pointer}
+.twords .tw:hover{border-color:var(--gold-line);background:var(--gold-soft)}
+.twords .tw .en{font-size:13px;font-weight:600;direction:ltr;text-align:left;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.twords .tw .fa{font-size:11.5px;color:var(--ink-3);min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.label .cnt{font-size:11px;color:var(--ink-3);font-weight:400;margin-right:4px}
+@media(max-width:560px){ .twords{grid-template-columns:1fr} }
+
+/* ردیف دکمه‌های پنجره‌ی کلمه — با اضافه شدن دکمه‌ی گزارش چهارتا شدند و
+   «حذف از دک مرور» دوخطی می‌شد. حالا هر دکمه یک‌خطی می‌ماند و ردیف
+   در صورت نیاز به خط بعد می‌رود. */
+.row-f{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.row-f>button{white-space:nowrap}
+.row-f>button.deckbtn{flex:1 1 auto;min-width:150px}
+@media(max-width:520px){ .row-f>button{flex:1 1 calc(50% - 8px)} }

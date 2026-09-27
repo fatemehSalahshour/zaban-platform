@@ -167,25 +167,140 @@ class ZabanSecurityTest extends TestCase
      |  نسخه‌ی نمایشی (سال دمو)
      * ================================================================= */
 
-    public function test_demo_gives_only_the_demo_year(): void
+    public function test_admin_pages_have_every_route_they_reference(): void
     {
-        $this->demo(1405, ['ce']);
-        $user = $this->userWith([]);
-        $in   = $this->wordIn('ce', 1405);
-        $out  = $this->wordIn('ce', 1390);
+        /* صفحه‌ی کاربران به route('impersonate.start') اشاره داشت ولی مسیرش
+           ثبت نشده بود و صفحه ۵۰۰ می‌داد. این تست همان دسته خطا را می‌گیرد:
+           هر صفحه‌ی پنل باید بدون خطا ساخته شود. */
+        $admin = $this->userWith([]);
+        DB::table('users')->where('id', $admin->id)->update(['type' => 'admin']);
+        $admin->refresh();          /* وگرنه نمونه‌ی در حافظه هنوز «دانشجو» است */
 
-        $res  = $this->actingAs($user)->getJson('/api/content?exam=ce')
-                     ->assertOk()->assertJsonPath('demo_year', 1405);
-        $body = $res->getContent();
-
-        /* محتوای سال‌های دیگر اصلاً از سرور بیرون نمی‌رود */
-        $this->assertStringContainsString($this->wordText($in), $body);
-        $this->assertStringNotContainsString($this->wordText($out), $body);
+        foreach (['/zaban-admin', '/zaban-admin/users', '/zaban-admin/settings',
+                  '/zaban-admin/words', '/zaban-admin/reports'] as $url) {
+            $this->actingAs($admin)->get($url)->assertOk();
+        }
     }
 
-    public function test_demo_answer_only_for_demo_year(): void
+    public function test_csrf_endpoint_gives_a_usable_token(): void
     {
-        $this->demo(1405, ['ce']);
+        /* تبی که باز مانده بعد از عوض شدن نشست ۴۱۹ می‌گرفت و رابط راهی برای
+           گرفتن توکن تازه نداشت. این مسیر همان را می‌دهد. */
+        $user = $this->userWith([]);
+        $token = $this->actingAs($user)->getJson('/csrf')->assertOk()->json('token');
+
+        $this->assertNotEmpty($token);
+        $this->assertSame(csrf_token(), $token);
+    }
+
+    public function test_report_topics_match_between_form_and_server(): void
+    {
+        /* دکمه‌های فرم و فهرست مجاز سرور باید یکی باشند، وگرنه کاربر موضوعی
+           را می‌زند که سرور ردش می‌کند و دلیلش معلوم نیست. */
+        $html   = file_get_contents(resource_path('views/zaban.blade.php'));
+        preg_match_all('/data-topic="([^"]+)"/u', $html, $m);
+
+        $this->assertNotEmpty($m[1]);
+        $this->assertSame(
+            \App\Http\Controllers\ZabanReportController::TOPICS,
+            array_values(array_unique($m[1]))
+        );
+        $this->assertContains('این کلمه در این تست نیست',
+            \App\Http\Controllers\ZabanReportController::TOPICS);
+    }
+
+    public function test_buy_page_opens_for_trial_and_for_buyer(): void
+    {
+        /* صفحه‌ی خرید هنوز $demo می‌خواند در حالی که کنترلر $trial می‌فرستد و
+           ۵۰۰ می‌داد. هیچ تستی این صفحه را باز نمی‌کرد. */
+        $this->trial(true, 200, []);
+
+        $this->actingAs($this->userWith([]))->get('/buy?exam=it')->assertOk();
+        $this->actingAs($this->userWith(['ce']))->get('/buy?exam=it')->assertOk();
+
+        $this->trial(false, 200, []);
+        $this->actingAs($this->userWith([]))->get('/buy')->assertOk();
+    }
+
+    public function test_impersonation_round_trip(): void
+    {
+        $admin   = $this->userWith([]);
+        DB::table('users')->where('id', $admin->id)->update(['type' => 'admin']);
+        $admin->refresh();
+        $student = $this->userWith(['ce']);
+
+        $this->actingAs($admin)->post(route('impersonate.start', $student->id))->assertRedirect();
+        $this->assertSame($student->id, auth()->id(), 'باید به حساب دانشجو رفته باشد');
+
+        /* نوار برگشت باید روی صفحه باشد، وگرنه مدیر در حساب کاربر گیر می‌افتد */
+        $html = $this->get('/zaban')->assertOk()->getContent();
+        $this->assertStringContainsString('impersonate-bar', $html, 'نوار برگشت تزریق نشده');
+        $this->assertStringContainsString(route('impersonate.stop'), $html);
+
+        /* برگشت باید ممکن باشد، با اینکه کاربر فعلی دیگر مدیر نیست */
+        $this->post(route('impersonate.stop'))->assertRedirect(route('zadmin.users'));
+        $this->assertSame($admin->id, auth()->id(), 'باید به حساب مدیر برگردد');
+
+        /* و بعد از برگشت، نوار نباید بماند */
+        $this->assertStringNotContainsString('impersonate-bar',
+            $this->get('/zaban')->getContent());
+    }
+
+    public function test_passage_body_reaches_the_browser_under_the_key_it_reads(): void
+    {
+        /* سرور متن را با کلید en می‌فرستد و مرورگر هم باید همان را بخواند.
+           تا وقتی مرورگر دنبال body می‌گشت، پنجره‌ی پسیج بدون متن باز می‌شد
+           و هیچ خطایی هم نمی‌داد. */
+        $user = $this->userWith(['ce']);
+        DB::table('exam_texts')->insert([
+            'year' => 1404, 'exam' => 'ce', 'section' => 'passage', 'passage_number' => 1,
+            'title' => 'آزمایشی', 'body' => 'A passage body.', 'body_fa' => 'متن.',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $texts = $this->actingAs($user)->getJson('/api/content?exam=ce')->assertOk()->json('texts');
+        $this->assertNotEmpty($texts, 'متن‌ها باید فرستاده شوند');
+
+        $one = reset($texts);
+        $this->assertArrayHasKey('en', $one, 'مرورگر کلید en را می‌خواند');
+        $this->assertSame('A passage body.', $one['en']);
+    }
+
+    public function test_trial_shows_every_year_not_just_one(): void
+    {
+        /* هدفِ نسخه‌ی آزمایشی: کاربر قابلیت‌ها را کامل ببیند. اگر فقط یک سال
+           باز باشد، نوار سال‌ها و جدول «کجا آمده» خالی می‌مانند و کاربر فکر
+           می‌کند پلتفرم این‌ها را ندارد. */
+        $this->trial(true, 200, [['year' => 1405, 'exam' => 'ce']]);
+        $user = $this->userWith([]);
+        $a = $this->wordIn('ce', 1405);
+        $b = $this->wordIn('ce', 1390);
+
+        $body = $this->actingAs($user)->getJson('/api/content?exam=ce')->assertOk()->getContent();
+
+        $this->assertStringContainsString($this->wordText($a), $body);
+        $this->assertStringContainsString($this->wordText($b), $body, 'سال‌های دیگر هم باید دیده شوند');
+    }
+
+    public function test_trial_word_budget_is_total_and_counts_each_word_once(): void
+    {
+        $this->trial(true, 2, []);                       /* سقف ۲ کلمه */
+        $user = $this->userWith([]);
+        $w = [$this->wordIn('ce', 1405), $this->wordIn('ce', 1404), $this->wordIn('ce', 1403)];
+
+        $r = $this->actingAs($user)->getJson('/api/words/meanings?ids=' . implode(',', $w))->assertOk();
+        $this->assertCount(2, $r->json('items'), 'فقط دو کلمه باید باز شود');
+        $this->assertTrue($r->json('trial_locked'));
+
+        /* همان دو کلمه دوباره: رایگان، چون قبلاً باز شده‌اند */
+        $again = $this->actingAs($user)->getJson('/api/words/meanings?ids=' . $w[0] . ',' . $w[1])->assertOk();
+        $this->assertCount(2, $again->json('items'));
+        $this->assertNotTrue($again->json('trial_locked'));
+    }
+
+    public function test_trial_answers_only_on_trial_booklets(): void
+    {
+        $this->trial(true, 200, [['year' => 1405, 'exam' => 'ce']]);
         $user = $this->userWith([]);
         $qIn  = $this->questionIn('ce', 1405);
         $qOut = $this->questionIn('ce', 1390);
@@ -194,11 +309,11 @@ class ZabanSecurityTest extends TestCase
         $this->actingAs($user)->getJson("/api/question/$qOut/answer")->assertStatus(403);
     }
 
-    public function test_demo_exam_only_for_demo_year(): void
+    public function test_trial_exam_only_on_trial_booklets(): void
     {
-        $this->demo(1405, ['ce']);
+        $this->trial(true, 200, [['year' => 1405, 'exam' => 'ce']]);
         $user = $this->userWith([]);
-        $this->questionIn('ce', 1405);                          /* شروع آزمون سؤال می‌خواهد */
+        $this->questionIn('ce', 1405);
         $this->questionIn('ce', 1390);
         $body = ['exam' => 'ce', 'mode' => 'washback', 'duration_sec' => 0];
 
@@ -206,23 +321,23 @@ class ZabanSecurityTest extends TestCase
         $this->actingAs($user)->postJson('/api/exam/start', $body + ['year' => 1405])->assertCreated();
     }
 
-    public function test_demo_off_shows_paywall_again(): void
+    public function test_trial_off_shows_paywall_again(): void
     {
-        $this->demo(1405, ['ce']);
-        $this->demo(null, []);
+        $this->trial(false, 200, []);
         $user = $this->userWith([]);
 
         $this->actingAs($user)->getJson('/api/content?exam=ce')->assertStatus(403);
     }
 
-    public function test_demo_follows_profile_exam(): void
+    public function test_buyer_is_not_touched_by_the_trial_budget(): void
     {
-        $this->demo(1405, ['ce']);              /* پیش‌فرض مدیر: فقط مهندسی کامپیوتر */
-        $user = $this->userWith([]);
-        DB::table('zaban_profiles')->insert(['user_id' => $user->id, 'nickname' => null, 'exam' => 'it']);
+        /* سقف آزمایشی نباید به خریدار بچسبد — او سقف روزانه‌ی خودش را دارد */
+        $this->trial(true, 1, []);
+        $user = $this->userWith(['ce']);
+        $w = [$this->wordIn('ce', 1405), $this->wordIn('ce', 1404), $this->wordIn('ce', 1403)];
 
-        $this->actingAs($user)->getJson('/api/content?exam=it')->assertOk()->assertJsonPath('demo_year', 1405);
-        $this->actingAs($user)->getJson('/api/content?exam=ce')->assertStatus(403);
+        $r = $this->actingAs($user)->getJson('/api/words/meanings?ids=' . implode(',', $w))->assertOk();
+        $this->assertCount(3, $r->json('items'));
     }
 
     /* =================================================================
@@ -1026,9 +1141,9 @@ class ZabanSecurityTest extends TestCase
         return $qid;
     }
 
-    private function demo(?int $year, array $exams): void
+    private function trial(bool $on, int $cap, array $booklets): void
     {
-        app(Entitlements::class)->saveDemo($year, $exams);
+        app(Entitlements::class)->saveTrial($on, $cap, $booklets);
     }
 
     /** درگاه آزمایشی بدون APP_ENV=local — فقط در همین تست */
