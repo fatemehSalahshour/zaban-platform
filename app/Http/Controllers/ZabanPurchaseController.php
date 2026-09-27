@@ -45,13 +45,24 @@ class ZabanPurchaseController extends Controller
         $pre   = array_filter(explode(',', (string) $req->query('exam', '')));
 
         $uid = $req->user()->id;
+
+        /* مدیر/مدیرمحتوا رکورد واقعی خرید ندارد ولی Entitlements::for() همه‌ی
+           رشته‌ها را به او می‌دهد (بالاتر، $owned) — این‌جا هم همان‌طور نشان
+           می‌دهیم، وگرنه بالای صفحه «هنوز رشته‌ای نخریده‌اید» می‌گفت درحالی‌که
+           کارت‌های پایین‌تر «فعال است» نشان می‌دادند. */
+        $ents = $this->ent->isStaff($uid)
+            ? collect(Pricing::NAMES)->keys()->map(fn ($e) => (object) [
+                'exam' => $e, 'expires_at' => null, 'source' => 'staff',
+            ])->values()
+            : DB::table('zaban_entitlements')->where('user_id', $uid)->whereNull('revoked_at')
+                ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+                ->orderBy('exam')->get(['exam', 'expires_at', 'source']);
+
         return view('buy.index', [
             'names'   => Pricing::NAMES,
             'owned'   => $owned,
             /* رشته‌های فعال با تاریخ اعتبار */
-            'ents'    => DB::table('zaban_entitlements')->where('user_id', $uid)->whereNull('revoked_at')
-                ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
-                ->orderBy('exam')->get(['exam', 'expires_at', 'source']),
+            'ents'    => $ents,
             /* پرداخت‌های کاربر — سفارشی که هیچ‌وقت به درگاه نرسید (بدون نشانه) نشان داده نمی‌شود */
             'orders'  => DB::table('zaban_orders')->where('user_id', $uid)->whereNotNull('token')
                 ->orderByDesc('id')->limit(30)
@@ -62,6 +73,7 @@ class ZabanPurchaseController extends Controller
                 : null,
             'pre'     => array_values(array_diff(array_intersect($pre, array_keys(Pricing::NAMES)), $owned)),
             'bundles' => $this->pricing->bundles(),
+            'stats'   => $this->pricing->examStats(),
             'until'   => $this->pricing->accessUntil(),
             'fake'    => $this->gateway->fake(),
         ]);

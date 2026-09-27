@@ -76,6 +76,12 @@ class ZabanAdminSyncController extends Controller
             $lock->release();
         }
 
+        /* آمار «چند سال / چند کلمه / چند ظهور» روی کارت‌های صفحه‌ی خرید کش
+           دارد؛ اگر محتوای تازه‌ای اضافه شد، همان‌جا خودش را پیدا نکند. */
+        if ($status === 'done') {
+            Cache::forget('zaban.exam_stats');
+        }
+
         Cache::forever(self::LAST, [
             'status'  => $status,
             'by'      => auth()->user()->name ?? auth()->id(),

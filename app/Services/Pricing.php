@@ -121,6 +121,36 @@ class Pricing
     }
 
     /**
+     * آمار نمایشی هر رشته برای کارت‌های صفحه‌ی خرید — چند سال، چند کلمه‌ی
+     * یکتا، چند ظهور. از خودِ بانک کلمات حساب می‌شود، جایی دستی نوشته نشده
+     * تا با هر همگام‌سازی محتوا خودش به‌روز بماند. کش ده‌دقیقه‌ای دارد چون
+     * این عددها فقط با sync عوض می‌شوند، نه با هر بار باز شدن صفحه؛ سینک
+     * پنل مدیریت خودش بعد از پایان کار همین کش را پاک می‌کند.
+     *
+     * @return array<string, array{years:int, words:int, occ:int, y1:?int, y2:?int}>
+     */
+    public function examStats(): array
+    {
+        return Cache::remember('zaban.exam_stats', 600, function () {
+            $rows = DB::table('word_occurrences')
+                ->selectRaw('exam, count(distinct year) as years, count(distinct word_id) as words, count(*) as occ, min(year) as y1, max(year) as y2')
+                ->groupBy('exam')->get()->keyBy('exam');
+
+            $out = [];
+            foreach (Entitlements::EXAMS as $e) {
+                $r = $rows[$e] ?? null;
+                $out[$e] = [
+                    'years' => (int) ($r->years ?? 0), 'words' => (int) ($r->words ?? 0),
+                    'occ'   => (int) ($r->occ ?? 0),
+                    'y1'    => isset($r->y1) ? (int) $r->y1 : null,
+                    'y2'    => isset($r->y2) ? (int) $r->y2 : null,
+                ];
+            }
+            return $out;
+        });
+    }
+
+    /**
      * تاریخ پایان دسترسی — «تا روز برگزاری کنکور».
      * در zaban_meta با کلید exam_date نگه داشته می‌شود تا هر سال فقط
      * یک ردیف عوض شود، نه یک دیپلوی.

@@ -16,12 +16,9 @@ use App\Http\Controllers\ZabanAdminAlertController;
 Route::get('/', function (\App\Services\Pricing $pricing) {
     if (auth()->check()) return redirect()->route('zaban');
 
-    /* عدد فارسی با جداکننده‌ی فارسی — بقیه‌ی صفحه هم با رقم فارسی است */
-    $faNum = fn (int $n) => strtr(number_format($n),
-        ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹',','=>'٬']);
-
     return view('landing', [
-        'price'    => $faNum($pricing->bundles()[3] ?? 0),   /* هر سه رشته */
+        /* عدد فارسی با جداکننده‌ی فارسی — بقیه‌ی صفحه هم با رقم فارسی است */
+        'price'    => \App\Support\FaNum::format($pricing->bundles()[3] ?? 0),   /* هر سه رشته */
         'examDate' => $pricing->accessUntil(),         /* میلادی؛ شمارش معکوس صفحه */
     ]);
 })->name('home');

@@ -34,5 +34,5 @@
     <a class="btn" href="{{ route('buy', ['exam' => $o->exams]) }}">تلاش دوباره</a>
   @endif
 
-  <p class="note">شماره‌ی سفارش: <span class="num">{{ $o->id }}</span></p>
+  <p class="buyp-note">شماره‌ی سفارش: <span class="num">{{ $o->id }}</span></p>
 @endsection

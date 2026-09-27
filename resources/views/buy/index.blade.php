@@ -1,134 +1,175 @@
 @extends('buy._layout')
 @section('title', 'خرید و پرداخت‌ها')
+{{-- محتوا مستقیم روی زمینه‌ی پلتفرم می‌نشیند، نه توی کارت سفید _layout --}}
+@section('bare', true)
 
 @push('head')
 <style>
-  .ex{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
-      margin-bottom:10px;cursor:pointer}
-  .ex:hover{border-color:var(--gold-line)}
-  .ex input{width:18px;height:18px;accent-color:var(--gold)}
-  .ex.on{border-color:var(--gold);background:var(--gold-soft)}
-  .ex.owned{cursor:default;opacity:.75;background:var(--canvas)}
-  .ex b{flex:1;font-weight:500}
-  .tag{font-size:12px;background:var(--ok-soft);color:var(--ok);border-radius:20px;padding:1px 10px}
-  .sum{border-top:1px dashed var(--line);margin:18px 0 16px;padding-top:14px;font-size:14px}
-  .row{display:flex;justify-content:space-between;color:var(--ink-2);margin-bottom:4px}
-  .row.total{color:var(--ink);font-weight:700;font-size:17px;margin-top:8px}
-  .row.disc{color:var(--ok)}
-  h2{font-size:15px;font-weight:700;margin:26px 0 10px;padding-top:20px;border-top:1px solid var(--line)}
-  h2:first-of-type{margin-top:0;padding-top:0;border-top:0}
-  .own{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px}
-  .own:last-child{border-bottom:0}
-  .own small{color:var(--ink-3);font-size:12.5px}
-  .demo-row small{color:#8f6d1f}
-  .backlink{display:inline-block;margin-bottom:10px;font-size:13.5px;color:#6b7787;
-    text-decoration:none}
-  .backlink:hover{color:#16191d}
-  .pay{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 0;border-bottom:1px dashed var(--line);
-       font-size:13.5px;text-decoration:none;color:inherit}
-  .pay:last-child{border-bottom:0}
-  .pay:hover b{color:var(--gold)}
-  .pay .meta{grid-column:1/-1;color:var(--ink-3);font-size:12px}
-  .st{font-size:12px;border-radius:20px;padding:1px 10px;align-self:center}
-  .st.paid{background:var(--ok-soft);color:var(--ok)}
-  .st.failed,.st.expired{background:var(--danger-soft);color:var(--danger)}
-  .st.pending,.st.verifying{background:var(--gold-soft);color:#7d6320}
-  .empty{color:var(--ink-3);font-size:13.5px;padding:6px 0}
+  /* --ok/--danger در zaban.css نیست (آن‌جا --accent است)؛ این‌جا تعریفشان می‌کنیم. */
+  :root{--ok:#1d6b58;--ok-soft:#e6f2ee;--danger:#a8461f;--danger-soft:#fbe4dc}
+
+  .buyhead{font-size:24px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+  .buylead{color:var(--ink-2);margin-bottom:22px}
+
+  .buygrid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;align-items:start}
+  @media(max-width:820px){.buygrid{grid-template-columns:1fr}}
+
+  .pkg{position:relative;display:flex;gap:14px;background:var(--paper);border:2px solid var(--line);
+       border-radius:14px;padding:16px;cursor:pointer;margin-bottom:11px;transition:border-color .15s,background .15s}
+  .pkg:hover{border-color:var(--line-2)}
+  .pkg.on{border-color:var(--ok);background:var(--ok-soft)}
+  .pkg.owned{cursor:default;border-color:var(--ok);background:var(--ok-soft)}
+  .pkg input{position:absolute;opacity:0;pointer-events:none}
+  .pkg .box{width:22px;height:22px;border:2px solid var(--line-2);border-radius:6px;flex-shrink:0;margin-top:3px;
+       display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;background:var(--paper);transition:.15s}
+  .pkg.on .box,.pkg.owned .box{background:var(--ok);border-color:var(--ok)}
+  .pkg h4{font-size:16px;font-weight:700}
+  .pkg .d{font-size:13.5px;color:var(--ink-2);margin:2px 0 8px}
+  .pkg .tags{display:flex;gap:6px;flex-wrap:wrap}
+  .pkg .tag{font-size:12px;background:var(--canvas);border-radius:6px;padding:2px 9px;color:var(--ink-2)}
+  .pkg.on .tag,.pkg.owned .tag{background:#fff}
+  .pkg .pr{margin-right:auto;text-align:left;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .pkg .pr small{display:block;font-size:12px;font-weight:400;color:var(--ink-3)}
+  .pkg .own-tag{margin-right:auto;align-self:center;font-size:12px;background:#fff;color:var(--ok);
+       border-radius:20px;padding:3px 11px;font-weight:500;white-space:nowrap}
+
+  .ladder{display:flex;gap:8px;margin-top:14px}
+  .ladder div{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 8px;text-align:center;
+       font-size:12.5px;color:var(--ink-2);transition:.15s}
+  .ladder div.on{border-color:var(--ok);background:var(--ok-soft);color:var(--ok);font-weight:700}
+  .ladder b{display:block;font-size:15px;color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
+  .ladder div.on b{color:var(--ok)}
+
+  .hintbox{background:var(--canvas);border-radius:10px;padding:11px 13px;font-size:13px;color:var(--ink-2);margin-top:11px}
+
+  .sum{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px;position:sticky;top:78px}
+  .sum h3{font-size:16px;font-weight:700;margin-bottom:12px}
+  .sum .line{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;color:var(--ink-2)}
+  .sum .line b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+  .sum .line.off{color:#8d3617}
+  .sum .line.off b{color:#8d3617}
+  .sum .total{display:flex;justify-content:space-between;align-items:baseline;
+       border-top:1px solid var(--line);margin-top:10px;padding-top:12px}
+  .sum .total .v{font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .sum .was{font-size:12.5px;color:var(--ink-3);text-decoration:line-through;font-variant-numeric:tabular-nums}
+  .sum .savebox{background:#fdeed3;color:#8a5206;border-radius:10px;padding:9px 12px;font-size:13px;
+       margin-top:10px;font-weight:500}
+  .cta{display:block;width:100%;text-align:center;background:var(--ok);color:#fff;border:0;border-radius:12px;
+       padding:13px 26px;font:inherit;font-weight:500;font-size:16px;cursor:pointer;margin-top:14px}
+  .cta:hover{background:#14503f}
+  .cta[disabled]{background:#b9bec4;cursor:not-allowed}
 </style>
 @endpush
 
 @section('body')
-  <a class="backlink" data-back-platform href="{{ route('zaban') }}">→ بازگشت به پلتفرم</a>
-<h1>خرید و پرداخت‌ها</h1>
-  <p class="sub">رشته‌های فعال، خرید رشته‌ی تازه و سابقه‌ی پرداخت‌های شما.</p>
-
-  <h2>رشته‌های شما</h2>
-  @forelse ($ents as $e)
-    <div class="own"><span>✓ {{ $names[$e->exam] ?? $e->exam }}</span>
-      <small>@if ($e->expires_at) اعتبار تا <span data-date="{{ $e->expires_at }}">{{ substr($e->expires_at, 0, 10) }}</span>
-             @else بدون تاریخ انقضا @endif</small></div>
-  @empty
-    <div class="empty">هنوز رشته‌ای نخریده‌اید.</div>
-  @endforelse
-  {{-- نسخه‌ی آزمایشی: همه‌ی سال‌ها دیده می‌شود، فقط عمق سهمیه دارد --}}
-  @if ($trial)
-    <div class="own demo-row">
-      <span>نسخه‌ی آزمایشی</span>
-      <small>{{ $trial['remaining'] }} کلمه از {{ $trial['cap'] }} باقی مانده</small>
-    </div>
-  @endif
-
-  <h2>خرید رشته</h2>
+  <h2 class="buyhead">پکیج خود را انتخاب کنید</h2>
+  <p class="buylead">هر پکیج شامل کل کلمات {{ \App\Support\FaNum::format(max(array_column($stats, 'years')) ?: 0) }} سال همان رشته است. با انتخاب چند رشته، تخفیف پلکانی خودکار اعمال می‌شود.</p>
 
   @if ($fake)<div class="dev">محیط توسعه: درگاه آزمایشی روشن است و پولی جابه‌جا نمی‌شود.</div>@endif
   @if (session('buy_error'))<div class="err" role="alert">{{ session('buy_error') }}</div>@endif
   @if ($errors->any())<div class="err" role="alert">{{ $errors->first() }}</div>@endif
 
+  @php
+    $unit = $bundles[1] ?? 0;
+    $remaining = count($names) - count($owned);
+  @endphp
+
   <form method="post" action="{{ route('buy.start') }}" id="f">
     @csrf
-    @foreach ($names as $code => $name)
-      @php $isOwned = in_array($code, $owned, true); @endphp
-      <label class="ex {{ $isOwned ? 'owned' : '' }}">
-        <input type="checkbox" name="exams[]" value="{{ $code }}"
-               @checked(in_array($code, old('exams', $pre), true)) @disabled($isOwned)>
-        <b>{{ $name }}</b>
-        @if ($isOwned)<span class="tag">فعال است</span>@endif
-      </label>
-    @endforeach
+    <div class="buygrid">
+      <div>
+        @foreach ($names as $code => $name)
+          @php $isOwned = in_array($code, $owned, true); $st = $stats[$code] ?? ['years'=>0,'words'=>0,'occ'=>0,'y1'=>null,'y2'=>null]; @endphp
+          <label class="pkg {{ $isOwned ? 'owned' : '' }}">
+            @unless ($isOwned)
+              <input type="checkbox" name="exams[]" value="{{ $code }}"
+                     @checked(in_array($code, old('exams', $pre), true))>
+            @endunless
+            <div class="box">✓</div>
+            <div style="flex:1">
+              <h4>کلمات ارشد {{ $name }}</h4>
+              <div class="d">تمام کلمات وکب، کلوز تست و پسیج آزمون {{ $name }}@if ($st['y1'] && $st['y2']) از {{ \App\Support\FaNum::format($st['y1']) }} تا {{ \App\Support\FaNum::format($st['y2']) }}@endif</div>
+              <div class="tags">
+                <span class="tag">{{ \App\Support\FaNum::format($st['years']) }} سال</span>
+                <span class="tag">{{ \App\Support\FaNum::format($st['words']) }} کلمه‌ی یکتا</span>
+                <span class="tag">{{ \App\Support\FaNum::format($st['occ']) }} ظهور</span>
+              </div>
+            </div>
+            @if ($isOwned)
+              <span class="own-tag">فعال است</span>
+            @else
+              <div class="pr">{{ \App\Support\FaNum::format($unit) }}<small>تومان</small></div>
+            @endif
+          </label>
+        @endforeach
 
-    <div class="sum" id="sum" aria-live="polite">
-      <div class="row"><span>یک رشته را انتخاب کنید.</span></div>
+        @if ($remaining > 1)
+          <div class="ladder" id="ladder">
+            @foreach (range(1, min(3, $remaining)) as $n)
+              @php
+                $list = $n * $unit;
+                $pay  = $bundles[$n] ?? $list;
+                $off  = $list > 0 ? (int) round((($list - $pay) / $list) * 100) : 0;
+              @endphp
+              <div data-n="{{ $n }}"><b>{{ \App\Support\FaNum::format($pay) }}</b>{{ $n === 1 ? 'یک رشته' : ($n === 2 ? 'دو رشته' : 'هر سه رشته') }}@if ($off > 0) · {{ \App\Support\FaNum::format($off) }}٪ تخفیف @endif</div>
+            @endforeach
+          </div>
+        @endif
+
+        <div class="hintbox">کلمات مشترک بین رشته‌ها در پکیج‌های ترکیبی یک بار حساب می‌شوند و تکراری نمی‌بینید؛ ولی فراوانی هر کلمه به تفکیک رشته باقی می‌ماند.</div>
+      </div>
+
+      <div class="sum" aria-live="polite">
+        <h3>خلاصه‌ی سفارش</h3>
+        <div id="lines"></div>
+        <div class="total">
+          <div><div style="font-size:13px;color:var(--ink-2)">مبلغ قابل پرداخت</div>
+            <div class="was" id="was" hidden></div></div>
+          <div class="v" id="total">۰ <span style="font-size:13px;font-weight:400">تومان</span></div>
+        </div>
+        <div class="savebox" id="save" hidden></div>
+        <button class="cta" id="pay" type="submit" disabled>پرداخت و فعال‌سازی</button>
+        <div class="hintbox" style="text-align:center">دسترسی تا روز برگزاری کنکور ارشد است.@if ($until)
+          <br><span class="num">{{ str_replace('-', '/', \App\Support\Jalali::formatFromGregorian(
+              \Illuminate\Support\Carbon::parse($until)->format('Y-m-d'))) }}</span>@endif</div>
+      </div>
     </div>
-
-    @if (count($owned) >= count($names))
-      <div class="ok">هر سه رشته برای شما فعال است.</div>
-    @endif
-    <button class="btn" id="pay" type="submit" disabled>پرداخت</button>
-    <p class="note">پرداخت از درگاه امن ایران کیش (شاپرک)
-      {{-- تاریخ میلادی برای کاربر ایرانی بی‌معناست؛ همه‌جای پلتفرم شمسی است --}}
-      @if ($until)· دسترسی تا {{ str_replace('-', '/', \App\Support\Jalali::formatFromGregorian(
-          \Illuminate\Support\Carbon::parse($until)->format('Y-m-d'))) }} @endif</p>
   </form>
-
-  <h2>پرداخت‌های من</h2>
-  @forelse ($orders as $o)
-    <a class="pay" href="{{ route('buy.result', $o->id) }}">
-      <b>{{ implode('، ', array_map(fn ($e) => $names[$e] ?? $e, array_filter(explode(',', $o->exams)))) }}</b>
-      <span class="st {{ $o->status }}">{{ ['paid' => 'موفق', 'failed' => 'ناموفق', 'expired' => 'منقضی',
-                                           'pending' => 'در انتظار', 'verifying' => 'در حال تأیید'][$o->status] ?? $o->status }}</span>
-      <span class="meta num">
-        <span data-date="{{ $o->paid_at ?? $o->created_at }}">{{ substr($o->paid_at ?? $o->created_at, 0, 16) }}</span>
-        · {{ number_format($o->payable) }} تومان
-        @if ($o->rrn) · مرجع {{ $o->rrn }} @endif
-        · سفارش {{ $o->id }}
-      </span>
-    </a>
-  @empty
-    <div class="empty">هنوز پرداختی نداشته‌اید.</div>
-  @endforelse
-
-<script>
-/* تاریخ‌ها به تقویم شمسی، با خود مرورگر */
-document.querySelectorAll('[data-date]').forEach(el=>{
-  const d=new Date(el.dataset.date.replace(' ','T'));
-  if(!isNaN(d)) el.textContent=d.toLocaleDateString('fa-IR',{year:'numeric',month:'long',day:'numeric'})
-    +(el.closest('.pay')?' — '+d.toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'}):'');
-});
-</script>
 
 <script>
 (function(){
-  const f=document.getElementById('f'), sum=document.getElementById('sum'), pay=document.getElementById('pay');
-  const toman=n=>Number(n).toLocaleString('fa-IR')+' تومان';
-  const boxes=[...f.querySelectorAll('input[type=checkbox]:not([disabled])')];
-  let seq=0;
+  const f=document.getElementById('f'), lines=document.getElementById('lines'),
+        pay=document.getElementById('pay'), ladder=document.getElementById('ladder'),
+        totalEl=document.getElementById('total'), wasEl=document.getElementById('was'),
+        saveEl=document.getElementById('save');
+  const money=n=>Number(n).toLocaleString('fa-IR');
+  const toman=n=>money(n)+' تومان';
+  const boxes=[...f.querySelectorAll('input[type=checkbox]')];
 
+  /* پلکان تخفیف مستقیم از سرور (نه از روی متن فارسیِ صفحه) — برای پیام
+     «با یک رشته‌ی دیگر چقدر بیشتر می‌پردازید». */
+  const BUNDLE=@json($bundles);
+
+  if(!boxes.length){                       /* هر سه رشته فعال است */
+    lines.innerHTML='<div class="line"><span>همه‌ی رشته‌ها برای شما فعال است.</span></div>';
+    pay.hidden=true; saveEl.hidden=true;
+    return;
+  }
+
+  let seq=0;
   async function refresh(){
-    boxes.forEach(b=>b.closest('.ex').classList.toggle('on',b.checked));
+    boxes.forEach(b=>b.closest('.pkg').classList.toggle('on',b.checked));
     const picked=boxes.filter(b=>b.checked).map(b=>b.value);
+    if(ladder)ladder.querySelectorAll('[data-n]').forEach(el=>el.classList.toggle('on',+el.dataset.n===picked.length));
+
     if(!picked.length){
-      sum.innerHTML='<div class="row"><span>یک رشته را انتخاب کنید.</span></div>'; pay.disabled=true; return;
+      lines.innerHTML='<div class="line"><span>هنوز پکیجی انتخاب نشده</span></div>';
+      totalEl.innerHTML='۰ <span style="font-size:13px;font-weight:400">تومان</span>';
+      wasEl.hidden=true; saveEl.hidden=true;
+      pay.disabled=true; pay.textContent='پرداخت و فعال‌سازی';
+      return;
     }
+
     const my=++seq; pay.disabled=true;
     try{
       /* قیمت از خود سرور — همان عددی که در سفارش گرفته می‌شود */
@@ -136,14 +177,27 @@ document.querySelectorAll('[data-date]').forEach(el=>{
                           {credentials:'same-origin',headers:{Accept:'application/json'}});
       if(!r.ok)throw new Error(r.status);
       const q=await r.json(); if(my!==seq)return;
-      sum.innerHTML=(q.lines||[]).map(l=>`<div class="row"><span>${l.name}</span><span class="num">${toman(l.price)}</span></div>`).join('')
-        +(q.discount>0?`<div class="row disc"><span>تخفیف چند رشته</span><span class="num">−${toman(q.discount)}</span></div>`:'')
-        +`<div class="row total"><span>مبلغ قابل پرداخت</span><span class="num">${toman(q.payable)}</span></div>`;
+
+      lines.innerHTML=(q.lines||[]).map(l=>`<div class="line"><span>${l.name}</span><b>${money(l.price)}</b></div>`).join('')
+        +(q.discount>0?`<div class="line off"><span>تخفیف پلکانی</span><b>− ${money(q.discount)}</b></div>`
+                      :`<div class="line off"><span>تخفیف پلکانی</span><b>− ۰</b></div>`);
+
+      totalEl.innerHTML=money(q.payable)+' <span style="font-size:13px;font-weight:400">تومان</span>';
+      if(q.discount>0){ wasEl.textContent=money(q.list_price)+' تومان'; wasEl.hidden=false; }
+      else wasEl.hidden=true;
+
+      /* «با یک رشته‌ی دیگر فقط چقدر بیشتر» — همان پیام نمونه‌ی طراحی */
+      const n=picked.length, next=BUNDLE[n+1];
+      if(next&&BUNDLE[n]){
+        saveEl.textContent=`با افزودن یک رشته‌ی دیگر، فقط ${toman(next-BUNDLE[n])} بیشتر می‌پردازید.`;
+        saveEl.hidden=false;
+      } else saveEl.hidden=true;
+
       pay.disabled=!(q.payable>0);
-      pay.textContent=q.payable>0?'پرداخت '+toman(q.payable):'پرداخت';
     }catch(e){
       if(my!==seq)return;
-      sum.innerHTML='<div class="row"><span>قیمت دریافت نشد. صفحه را دوباره باز کنید.</span></div>';
+      lines.innerHTML='<div class="line"><span>قیمت دریافت نشد. صفحه را دوباره باز کنید.</span></div>';
+      saveEl.hidden=true;
     }
   }
   boxes.forEach(b=>b.addEventListener('change',refresh));

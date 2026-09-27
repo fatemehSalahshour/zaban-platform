@@ -20,6 +20,12 @@ class Entitlements
     /** رشته‌های فعال کاربر — ['ce','it'] */
     public function for(int $userId): array
     {
+        /* مدیر/مدیرمحتوا/ویراستار برای تست همه‌چیز باید همه‌ی رشته‌ها را ببیند،
+           بدون این‌که رکورد خرید ساختگی در zaban_entitlements لازم باشد.
+           همین یک نقطه کافی است چون scope()/has() هر دو از همین‌جا می‌خوانند —
+           پس نه پی‌وال می‌بیند، نه به درگاه واقعی نیاز دارد. */
+        if ($this->isStaff($userId)) return self::EXAMS;
+
         return Cache::remember("zaban.ent.$userId", self::TTL, function () use ($userId) {
             return DB::table('zaban_entitlements')
                 ->where('user_id', $userId)
@@ -27,6 +33,15 @@ class Entitlements
                 ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
                 ->pluck('exam')
                 ->all();
+        });
+    }
+
+    /** آیا این کاربر staff پلتفرم است (admin/manager/editor)؟ — کش می‌شود چون نقش عوض نمی‌شود مگر دستی */
+    public function isStaff(int $userId): bool
+    {
+        return Cache::remember("zaban.staff.$userId", self::TTL, function () use ($userId) {
+            $type = DB::table('users')->where('id', $userId)->value('type');
+            return in_array($type, ['admin', 'manager', 'editor'], true);
         });
     }
 

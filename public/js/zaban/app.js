@@ -633,6 +633,12 @@ const NAV=[
     {t:"crowd",   n:"آمار جمعی"},
     {t:"balance", n:"تعادل و پوشش"},
   ]},
+  /* این یک تب داخلی نیست — /buy صفحه‌ای جداست (رجوع کنید به کامنت بالای
+     ZabanPurchaseController). پس به‌جای data-tab، یک لینک واقعی است؛
+     renderNav() پایین‌تر این تفاوت را با وجود href تشخیص می‌دهد. */
+  {id:"buy", name:"خرید", icon:"🛒", tabs:[
+    {t:"buy", n:"خرید و پرداخت‌ها", href:"/buy"},
+  ]},
 ];
 
 let navGroup="dash", navTab="rank";
@@ -651,9 +657,13 @@ function renderNav(){
   const bar=$("#navBar");
   if(bar){
     const due=dueCount();
-    bar.innerHTML = NAV_ROW.map(g=>`<span class="ngrp ${navGroup===g.id?"on":""}">
-        <i class="gl">${g.name}${(g.id==="mine"&&due)?`<span class="nb">${fa(due)}</span>`:""}</i>
-        ${g.tabs.map(x=>`<button data-tab="${x.t}" class="${navTab===x.t?"on":""}">${x.n}</button>`).join("")}
+    const remaining=Math.max(0,(EXAM_CODE_FA?Object.keys(EXAM_CODE_FA).length:3)-(window.OWNED_EXAMS||[]).length);
+    bar.innerHTML = NAV_ROW.map(g=>`<span class="ngrp ${g.id==="buy"?"buygrp ":""}${navGroup===g.id?"on":""}">
+        ${g.id==="buy"?"":`<i class="gl">${g.name}${(g.id==="mine"&&due)?`<span class="nb">${fa(due)}</span>`:""}</i>`}
+        ${g.tabs.map(x=>x.href
+            ? `<a href="${x.href}" class="${navTab===x.t?"on":""}">${x.n}${(g.id==="buy"&&remaining)?`<span class="nb">${fa(remaining)}</span>`:""}</a>`
+            : `<button data-tab="${x.t}" class="${navTab===x.t?"on":""}">${x.n}</button>`
+          ).join("")}
       </span>`).join('<i class="ndiv"></i>');
     /* تب فعال باید دیده شود، حتی اگر ردیف در عرض کم اسکرول شده باشد */
     const on=bar.querySelector("button.on");
