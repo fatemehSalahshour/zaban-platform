@@ -558,7 +558,7 @@ function renderWord(w){
      <div class="kin" style="gap:6px">
        <span class="badge b-once en">${w.pos}</span>
        <span class="badge ${lvlClass(w.lvl)}">${w.lvl}</span>
-       ${wChips([...new Set(w.occ.map(o=>o[0]))].sort((a,b)=>a-b), YEARS.length, w.occ.length)}
+       ${wChips([...new Set(w.occ.map(o=>o[0]))].sort((a,b)=>a-b), YEARS.length, w.occ.length, w.ally)}
      </div>
      <div class="row-f" style="margin-top:12px">
        <button class="deckbtn" style="flex:1" data-toggle="${w.w}">${deck.has(w.w)?"حذف از دک مرور":"افزودن به دک مرور"}</button>
@@ -583,6 +583,10 @@ function renderWord(w){
    })()}
    ${k.length?`<section><div class="label">هم‌خانواده‌ها</div><div class="kin">${k.map(x=>`<span class="en">${x.w}</span>`).join("")}</div></section>`:""}
    <section><div class="label">کجا در کنکور آمده است — ${fa(w.freq)} سال، ${fa(w.occ.length)} مورد</div>
+     ${(w.ally && w.ally > w.freq) ? `<div class="capt" style="margin:-4px 0 10px">
+       این کلمه در مجموع در ${fa(w.ally)} کنکور آمده است. ${fa(w.ally - w.freq)} سالِ دیگر
+       در رشته‌هایی است که تهیه نکرده‌اید و اینجا نشان داده نمی‌شود —
+       <a href="/buy" style="color:var(--gold)">تهیه‌ی دسترسی</a></div>` : ""}
      ${occTimeline(w)}
    </section>
 `;
@@ -3435,7 +3439,7 @@ document.addEventListener("click",e=>{
  * نشان‌های یک کلمه — همه‌جای پلتفرم دقیقاً همین‌ها و با همین ترتیب.
  * ys: سال‌های حضور (با فیلترهای همان تب) · span: طول بازه · tot: تعداد کل ظهور
  */
-function wChips(ys, span, tot){
+function wChips(ys, span, tot, allY){
   const st=wstats(ys); if(!st)return "";
   const c=[];
   if(st.best){
@@ -3452,7 +3456,16 @@ function wChips(ys, span, tot){
       <span class="runpop"><div class="rh">دوره‌های پیاپی این کلمه</div>${rows}</span>
     </span>`);
   }
-  c.push(`<span class="badge b-freq" data-tip="تعداد سال‌هایی که این کلمه در آن‌ها آمده">${fa(st.n)} سال از ${fa(span)}</span>`);
+  /* «چند سال از ۲۵» عمداً آمار کل بانک است (w.ally)، نه فقط سال‌هایی که این
+     کاربر می‌بیند. اگر این دو فرق داشته باشند، یعنی بقیه در رشته‌هایی است که
+     نخریده — و باید همین را بگوییم، وگرنه کاربر فکر می‌کند بانک ناقص است یا
+     پلتفرم باگ دارد. */
+  const seen = st.n, all = (allY != null && allY > seen) ? allY : seen;
+  c.push(`<span class="badge b-freq" data-tip="${all > seen
+      ? `این کلمه در ${fa(all)} کنکور آمده است. ${fa(seen)} تای آن در رشته‌های شماست؛ بقیه در رشته‌هایی است که هنوز تهیه نکرده‌اید.`
+      : "تعداد سال‌هایی که این کلمه در آن‌ها آمده"}">${fa(all)} سال از ${fa(span)}</span>`);
+  if(all > seen)
+    c.push(`<a class="badge b-lock" href="/buy" data-tip="برای دیدن ${fa(all-seen)} سال دیگر، رشته‌اش را تهیه کنید">🔒 ${fa(seen)} سال در دسترس شما</a>`);
   if(st.mean!==null)
     c.push(`<span class="badge b-gap" data-tip="میانگین فاصله‌ی بین دو حضور پشت‌سرهم این کلمه">میانگین فاصله ${fa(st.mean)} سال</span>`);
   c.push(`<span class="badge b-once" data-tip="آخرین حضور: کنکور ${fa(st.last)}">${

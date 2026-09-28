@@ -225,7 +225,12 @@ class ContentBuilder
 
         $words = DB::table('words')->whereIn('id', $ids)
             ->select('id', 'word', 'pos_primary', 'level',
-                     'form_base', 'form_past', 'form_participle', 'pred_score')
+                     'form_base', 'form_past', 'form_participle', 'pred_score',
+                     /* آمار کل بانک، مستقل از دسترسی کاربر. فقط دو عدد است و
+                        محتوایی لو نمی‌دهد، ولی به کاربر می‌گوید این کلمه در
+                        چند سال دیگر هم آمده که او نمی‌بیند — وگرنه خیال
+                        می‌کند بانک ناقص است. */
+                     'year_count', 'occurrence_count')
             ->orderBy('word')->get();
 
         $occ = [];
@@ -255,6 +260,9 @@ class ContentBuilder
                 'forms' => $forms ? [$w->form_base, $w->form_past, $w->form_participle] : null,
                 'ipa'   => null,
                 'occ'   => $occ[$w->id] ?? [],
+                /* آمار کل بانک — برای تشخیص «نمی‌بینم چون نخریده‌ام» از «نیست» */
+                'ally'  => (int) ($w->year_count ?? 0),
+                'allo'  => (int) ($w->occurrence_count ?? 0),
                 'pred'  => $w->pred_score !== null ? (float) $w->pred_score : null,
             ];
         }
