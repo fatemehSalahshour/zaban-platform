@@ -170,6 +170,9 @@ class ImportZaban extends Command
         $newFa = $this->col($r, ['Persian Meaning', 'Meaning']);
         $oldFa = $wid ? (string) DB::table('words')->where('id', $wid)->value('meaning_fa') : '';
 
+        /* ادغام، بعد یکتاسازی. مقایسه‌ی رشته‌به‌رشته کافی نبود: «عینی» و
+           «عینی، بی‌طرفانه» دو تکه‌ی متفاوت حساب می‌شدند و معنی‌ها با هر
+           ایمپورت روی هم تلنبار می‌شدند (App\Support\Meanings). */
         $parts = array_filter(array_map('trim', explode('/', $oldFa)));
         $fresh = array_filter(array_map('trim', explode('/', $newFa)));
         foreach ($fresh as $f) {
@@ -177,7 +180,7 @@ class ImportZaban extends Command
         } 
 
         $data = [
-            'meaning_fa'  => implode(' / ', $parts),
+            'meaning_fa'  => \App\Support\Meanings::normalize(implode(' / ', $parts)),
             'pos_raw'     => $posRaw ?: null,
             'pos_primary' => $this->basePos($posRaw),
             'is_phrase'   => preg_match('/phrase|phrasal|idiom/i', $posRaw) ? 1 : 0,

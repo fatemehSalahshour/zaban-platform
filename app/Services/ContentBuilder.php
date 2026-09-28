@@ -367,8 +367,12 @@ class ContentBuilder
     public function meanings(array $wordIds): array
     {
         if (!$wordIds) return [];
+        /* یکتاسازی هنگام خواندن — شبکه‌ی ایمنی است، نه جای اصلاح داده:
+           ردیف‌های قدیمی با zaban:clean-meanings تمیز می‌شوند و ایمپورت هم
+           دیگر تکراری نمی‌سازد. این فقط تضمین می‌کند هیچ‌وقت «عینی / عینی»
+           روی کارت مرور دیده نشود. */
         return DB::table('words')->whereIn('id', $wordIds)->pluck('meaning_fa', 'id')
-            ->mapWithKeys(fn ($v, $k) => [(int) $k => (string) $v])->all();
+            ->mapWithKeys(fn ($v, $k) => [(int) $k => \App\Support\Meanings::normalize((string) $v)])->all();
     }
 
     public function examples(array $wordIds): array
