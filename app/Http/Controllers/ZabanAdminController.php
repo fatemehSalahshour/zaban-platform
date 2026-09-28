@@ -49,29 +49,57 @@ class ZabanAdminController extends Controller
      * ردیفی ندارند و اگر از آنجا بپرسیم بی‌صدا از قلم می‌افتند —
      * یعنی پنل «همه کامل است» می‌گوید در حالی که نیست.
      *
-     * تعداد مورد انتظار همان‌طور حساب می‌شود که SyncQuestions حساب
-     * می‌کند: هر وکب یک سؤال، هر کلوز و پسیج به تعداد فرزندهایش.
+     * تعداد مورد انتظار دقیقاً همان‌طور شمرده می‌شود که SyncQuestions
+     * می‌شمارد: وکب یک سؤال، کلوز و پسیج به تعداد فرزندهای زنده‌شان.
+     *
+     * قبلاً اینجا از ستون childes_count استفاده می‌شد و سینک از شمردن
+     * واقعی فرزندها. آن ستون یک شمارنده‌ی ذخیره‌شده است و سؤالِ حذف‌شده
+     * را هم می‌شمارد، پس پنل عددی بزرگ‌تر از واقعیت نشان می‌داد و
+     * دفترچه‌های کامل را «ناقص» جا می‌زد — تا جایی که برای ۱۳۹۲ عدد ۳۱
+     * می‌داد، که اصلاً ممکن نیست.
+     *
+     * سؤال‌های والد هم با زیرکوئری گرفته می‌شوند نه join، چون سؤالی که
+     * بین دو رشته مشترک است در join دو بار برمی‌گردد و عدد را باد می‌کند
+     * (همان دلیلی که در SyncQuestions::plan() نوشته شده).
      */
     private function contentGaps(): array
     {
+        $major = [1 => 'ce', 2 => 'it', 3 => 'cs'];
+        $expected = [];
+
         try {
-            /* رشته از جدول واسط question_major (یک سؤال می‌تواند چند رشته داشته باشد) */
-            $expected = DB::connection('azmoon')->table('question as q')
-                ->join('question_major as qm', 'qm.question_id', '=', 'q.id')
-                ->where('q.is_language', 1)->where('q.parent_id', 0)
-                ->where('q.type', 'sarasari')->where('q.status', '!=', 'deleted')
-                ->whereIn('qm.major_id', [1, 2, 3])
-                ->selectRaw('q.year AS year, qm.major_id AS major_id,
-                             SUM(CASE WHEN q.kind IN (2,3) THEN q.childes_count ELSE 1 END) AS n')
-                ->groupBy('q.year', 'qm.major_id')
-                ->get();
+            foreach ($major as $mid => $code) {
+                $parents = DB::connection('azmoon')->table('question')
+                    ->where('is_language', 1)->where('parent_id', 0)
+                    ->where('type', 'sarasari')->where('status', '!=', 'deleted')
+                    ->whereIn('id', fn ($sub) => $sub->select('question_id')
+                        ->from('question_major')->where('major_id', $mid))
+                    ->get(['id', 'year', 'kind']);
+
+                if ($parents->isEmpty()) continue;
+
+                /* فرزندهای زنده‌ی همه‌ی والدها در یک کوئری، نه یکی‌یکی */
+                $kids = DB::connection('azmoon')->table('question')
+                    ->whereIn('parent_id', $parents->pluck('id'))
+                    ->where('status', '!=', 'deleted')
+                    ->selectRaw('parent_id, COUNT(*) AS n')
+                    ->groupBy('parent_id')->pluck('n', 'parent_id');
+
+                foreach ($parents as $p) {
+                    /* kind: ۱ وکب، ۲ پسیج، ۳ کلوز — همان نگاشت SyncQuestions */
+                    if (!in_array((int) $p->kind, [1, 2, 3], true)) continue;
+
+                    $n = (int) $p->kind === 1 ? 1 : (int) ($kids[$p->id] ?? 0);
+                    if ($n === 0) continue;          /* والد بی‌فرزند: سینک هم ردش می‌کند */
+
+                    $expected[$p->year . '|' . $code] = ($expected[$p->year . '|' . $code] ?? 0) + $n;
+                }
+            }
         } catch (\Throwable $e) {
             /* دیتابیس آزمون در دسترس نیست — بهتر است پنل بگوید نمی‌داند
                تا اینکه «همه کامل است» را جای واقعیت جا بزند. */
             return ['error' => 'اتصال به دیتابیس پلتفرم آزمون برقرار نشد.'];
         }
-
-        $major = [1 => 'ce', 2 => 'it', 3 => 'cs'];
 
         $actual = DB::table('questions')
             ->selectRaw('year, exam, COUNT(*) AS n')
@@ -79,16 +107,13 @@ class ZabanAdminController extends Controller
             ->keyBy(fn ($r) => $r->year . '|' . $r->exam);
 
         $gaps = [];
-        foreach ($expected as $e) {
-            $code = $major[$e->major_id] ?? null;
-            if (!$code) continue;
-
-            $have = (int) ($actual[$e->year . '|' . $code]->n ?? 0);
-            $want = (int) $e->n;
+        foreach ($expected as $key => $want) {
+            [$year, $code] = explode('|', $key);
+            $have = (int) ($actual[$key]->n ?? 0);
             if ($have >= $want) continue;
 
             $gaps[] = [
-                'year'     => (int) $e->year,
+                'year'     => (int) $year,
                 'exam'     => Pricing::NAMES[$code] ?? $code,
                 'missing'  => $want - $have,
                 'expected' => $want,
