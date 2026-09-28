@@ -769,12 +769,6 @@ html[data-theme="dim"] .dashbtn.on,html[data-theme="dark"] .dashbtn.on{
 .ex-ws button.in .en{color:var(--accent)}
 /* سربرگ گروه: عنوان راست، دکمه چپ، در یک خط */
 .ex-wg{margin-top:14px}
-/* فهرست کلمات متن در صفحه‌ی پسیج — وقتی بلند است بسته می‌ماند */
-.twfold{margin-top:16px;border-top:1px solid var(--line);padding-top:4px}
-.twfold > summary{list-style:none;cursor:pointer;display:flex;align-items:center;padding:8px 0}
-.twfold > summary::-webkit-details-marker{display:none}
-.twfold > summary .ch{margin-right:auto;font-style:normal;color:var(--ink-3);transition:.15s}
-.twfold[open] > summary .ch{transform:rotate(180deg)}
 /* گروه جمع‌شونده‌ی کلمات متن پسیج/کلوز — بسته می‌ماند تا پاسخ تشریحی و
    کلمات خود سؤال از دید بیرون نروند. */
 .ex-wg.fold{border:1px solid var(--line);border-radius:10px;padding:0 11px}

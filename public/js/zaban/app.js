@@ -1146,11 +1146,27 @@ function textWords(y,e,sec,p){
   return WORDS.filter(w=>w.occ.some(o=>o[0]===y&&o[1]===e&&o[2]===sec&&o[3]===0&&(o[4]||0)===(p||0)));
 }
 function highlight(body,ws){
-  let out=body;
-  ws.forEach(w=>{
-    out=out.replace(new RegExp("\\b("+w.w+")\\b","gi"),'<b class="kw en" data-w="'+w.w+'">$1</b>');
+  if(!body||!ws||!ws.length)return body;
+  /* یک گذر، نه حلقه‌ی جایگزینی.
+
+     قبلاً برای هر کلمه یک replace روی خروجیِ قبلی زده می‌شد. کلمه‌ی «data»
+     که در بانک هست، با \b داخل ویژگی data-w="..." که خودِ همین تابع درج
+     کرده بود هم مطابقت می‌گرفت (چون «-» مرز کلمه است) و تگ را از وسط
+     می‌شکست؛ بقیه‌ی تگ به‌شکل متن خام وسط پسیج دیده می‌شد.
+
+     با یک الگوی ترکیبی، هر جای متن فقط یک بار بررسی می‌شود و چیزی که
+     درج شد دیگر ورودیِ جایگزینی بعدی نیست. */
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  /* بلندترها اول، وگرنه «data» جلوی «process data» را می‌گیرد */
+  const list = ws.map(w=>w.w).filter(Boolean).sort((a,b)=>b.length-a.length);
+  if(!list.length)return body;
+
+  const map={}; list.forEach(w=>map[w.toLowerCase()]=w);
+  const re = new RegExp("\\b("+list.map(esc).join("|")+")\\b","gi");
+  return body.replace(re, m => {
+    const w = map[m.toLowerCase()] || m;
+    return '<b class="kw en" data-w="'+w+'">'+m+'</b>';
   });
-  return out;
 }
 const _txtCache={};
 /* در نسخه‌ی demo متن‌ها از قالب TXTTPL ساخته می‌شدند. سرور متن واقعی
@@ -1184,13 +1200,12 @@ function renderText(y,e,sec,p){
      <div class="capt">کلمات هایلایت‌شده در بانک ثبت شده‌اند؛ روی هرکدام بزنید تا معنی و تاریخچه‌اش باز شود.</div></section>
    ${g?`<section><div class="label">سؤال‌های این ${sec==="پسیج"?"پسیج":"کلوز"}</div>
      <div class="kin">${Array.from({length:g[4]-g[3]+1},(_,i)=>g[3]+i).map(q=>`<span data-goq="${y}|${e}|${q}" style="cursor:pointer">تست ${fa(q)}</span>`).join("")}</div></section>`:""}
-   <details class="twfold" ${ws.length<=12?"open":""}>
-     <summary><span class="label" style="margin:0">کلمات این متن <span class="cnt">${fa(ws.length)}</span></span><i class="ch">▾</i></summary>
+   <section><div class="label">کلمات این متن <span class="cnt">${fa(ws.length)}</span></div>
      <div class="twords">${ws.slice().sort((a,b)=>a.w.localeCompare(b.w)).map(w=>{
         const m=MEANS[WID[w.w]]||"";
         return `<button class="tw" data-w="${w.w}">
           <bdi class="en">${w.w}</bdi><span class="fa">${m||"…"}</span></button>`;
-      }).join("")}</div></details>`;
+      }).join("")}</div></section>`;
   $("#detail").classList.remove("open");$("#qview").classList.add("open");
 }
 
