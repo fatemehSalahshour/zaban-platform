@@ -82,11 +82,12 @@ class ContentBuilder
      *   نباشد، مرورگر یکی ۳۰۴ می‌گیرد و محتوای ناقصِ کش‌شده را نگه می‌دارد.
      *   نسخه‌ی همه‌ی رشته‌های دخیل هم می‌آید تا همگام‌سازی هر کدام تازه‌اش کند.
      */
-    public function etag(string $exam, string $part, array $also = []): string
+    public function etag(string $exam, string $part, array $also = [], array $books = []): string
     {
         $exams = $this->examSet($exam, $also);
         $vers  = implode(',', array_map(fn ($e) => $this->version($e), $exams));
-        return '"' . substr(sha1("$exam|$part|" . implode('-', $exams) . "|$vers"), 0, 20) . '"';
+        $b     = $books ? $this->booksTag($books) : '';
+        return '"' . substr(sha1("$exam|$part|" . implode('-', $exams) . "|$vers|$b"), 0, 20) . '"';
     }
 
     /* ================= هسته ================= */
@@ -109,26 +110,34 @@ class ContentBuilder
      *   کلید کش شامل همین مجموعه است، پس کسی که یک رشته خریده هرگز پاسخ
      *   کش‌شده‌ی کسی که سه رشته دارد را نمی‌گیرد.
      */
-    public function core(string $exam, ?int $year = null, array $also = []): array
+    public function core(string $exam, ?int $year = null, array $also = [], array $books = []): array
     {
         $exams = $this->examSet($exam, $also);
-        $tag   = implode('-', $exams);
+        $tag   = implode('-', $exams) . ($books ? '.b' . $this->booksTag($books) : '');
 
         $key = $year
             ? "zaban.content.core.$exam.$tag.y$year." . $this->version($exam)
             : "zaban.content.core.$exam.$tag";
 
-        return Cache::remember($key, 86400, function () use ($exam, $exams, $year) {
+        return Cache::remember($key, 86400, function () use ($exam, $exams, $books, $year) {
             return [
                 'version'   => $this->version($exam),
                 'exam'      => $exam,
                 'demo_year' => $year,
                 'years'     => $this->years($exam, $year),
                 'struct'    => $this->struct($exam, $year),
-                'words'     => $this->words($exams, $year),
-                'texts'     => $this->texts($exams, $year),
+                'words'     => $this->words($exams, $books, $year),
+                'texts'     => $this->texts($exams, $books, $year),
             ];
         });
+    }
+
+    /** امضای کوتاه و پایدار از فهرست دفترچه‌های آزمایشی، برای کلید کش و ETag */
+    public function booksTag(array $books): string
+    {
+        $p = array_map(fn ($b) => $b['year'] . ':' . $b['exam'], $books);
+        sort($p);
+        return substr(sha1(implode(',', $p)), 0, 8);
     }
 
     /** رشته‌ی جاری اول، بقیه‌ی رشته‌های مجاز بعدش — یکتا و مرتب، تا کلید کش پایدار بماند */
@@ -172,6 +181,31 @@ class ContentBuilder
     }
 
     /**
+     * محدود کردن یک کوئری روی word_occurrences به آنچه کاربر می‌بیند.
+     *
+     * دو چیز جداگانه‌اند و با OR جمع می‌شوند:
+     *   ۱) رشته‌های خریداری‌شده — همه‌ی سال‌هایشان
+     *   ۲) دفترچه‌های آزمایشی — فقط همان ترکیب سال+رشته، برای همه باز است
+     *
+     * @param string[] $exams
+     * @param array<array{year:int,exam:string}> $books
+     */
+    private function scopeOcc($q, array $exams, array $books, ?int $year = null)
+    {
+        return $q->where(function ($w) use ($exams, $books, $year) {
+            if ($exams) {
+                $w->where(fn ($x) => $x->whereIn('exam', $exams)
+                    ->when($year, fn ($z) => $z->where('year', $year)));
+            }
+            foreach ($books as $b) {
+                $w->orWhere(fn ($x) => $x->where('exam', $b['exam'])->where('year', $b['year']));
+            }
+            /* نه رشته‌ای، نه دفترچه‌ای — هیچ ردیفی نباید برگردد */
+            if (!$exams && !$books) $w->whereRaw('1 = 0');
+        });
+    }
+
+    /**
      * شکل خروجی عمداً همان چیزی است که پروتوتایپ بعد از decode() می‌سازد:
      *   {w, fa, pos, lvl(نام فارسی), forms, ipa, ex:[[en,fa]],
      *    occ:[[سال, نام فارسی رشته, نام فارسی بخش, شماره تست, شماره پسیج]]}
@@ -179,12 +213,12 @@ class ContentBuilder
      *
      * اگر این شکل را عوض کنید، decode() در پروتوتایپ می‌شکند.
      *
-     * @param string[] $exams رشته‌هایی که کاربر حق دیدنشان را دارد
+     * @param string[] $exams رشته‌های خریداری‌شده
+     * @param array<array{year:int,exam:string}> $books دفترچه‌های آزمایشی
      */
-    private function words(array $exams, ?int $year = null): array
+    private function words(array $exams, array $books = [], ?int $year = null): array
     {
-        $ids = DB::table('word_occurrences')->whereIn('exam', $exams)
-            ->when($year, fn ($q) => $q->where('year', $year))
+        $ids = $this->scopeOcc(DB::table('word_occurrences'), $exams, $books, $year)
             ->distinct()->pluck('word_id')->all();
 
         if (!$ids) return [];
@@ -195,8 +229,7 @@ class ContentBuilder
             ->orderBy('word')->get();
 
         $occ = [];
-        DB::table('word_occurrences')->whereIn('word_id', $ids)->whereIn('exam', $exams)
-            ->when($year, fn ($q) => $q->where('year', $year))     /* دمو: کاربرد در سال‌های دیگر هم لو نرود */
+        $this->scopeOcc(DB::table('word_occurrences')->whereIn('word_id', $ids), $exams, $books, $year)
             ->orderBy('year', 'desc')
             ->get(['word_id', 'year', 'exam', 'section', 'test_number', 'passage_number'])
             ->each(function ($o) use (&$occ) {
@@ -229,11 +262,10 @@ class ContentBuilder
     }
 
     /** @param string[] $exams — کلید خروجی شامل نام رشته است، پس ادغام امن است */
-    private function texts(array $exams, ?int $year = null): array
+    private function texts(array $exams, array $books = [], ?int $year = null): array
     {
         $out = [];
-        DB::table('exam_texts')->whereIn('exam', $exams)
-            ->when($year, fn ($q) => $q->where('year', $year))
+        $this->scopeOcc(DB::table('exam_texts'), $exams, $books, $year)
             ->get(['year', 'exam', 'section', 'passage_number', 'body', 'body_fa'])
             ->each(function ($t) use (&$out) {
                 $key = $t->year . '|' . (self::EXAM_FA[$t->exam] ?? $t->exam)

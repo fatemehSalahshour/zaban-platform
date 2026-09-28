@@ -63,23 +63,33 @@ class ZabanController extends Controller
 
         /* رشته‌هایی که کلمه‌ها و متن‌هایشان در این پاسخ می‌آید.
 
-           قاعده: اگر کاربر چیزی خریده، فقط همان‌ها. اگر هیچ نخریده و حالت
-           آزمایشی روشن است، هر سه رشته (سقف ۲۰۰ کلمه جای دیگری اعمال می‌شود).
+           دو چیز جداگانه‌اند و نباید با هم قاتی شوند:
 
-           این دو حالت عمداً جمع نمی‌شوند: قبلاً خریده‌ها و رشته‌های آزمایشی
-           را با هم می‌گرفتم و نتیجه این شد که کسی که فقط مهندسی خریده بود،
-           جدول «کجا در کنکور آمده است» را برای آی‌تی و علوم هم می‌دید.
-           سقف سهمیه جلوی این را نمی‌گیرد، چون فقط روی معنی و مثال است نه
-           روی ظهورها. */
-        $also = [];
+           ۱) رشته‌های خریداری‌شده → همه‌ی سال‌هایشان.
+              کسی که هیچ نخریده و حالت آزمایشی روشن است، هر سه رشته را
+              می‌گیرد (سقف کلمه جای دیگری اعمال می‌شود).
+
+           ۲) دفترچه‌های آزمایشی که مدیر در تنظیمات تیک زده → فقط همان
+              ترکیب سال+رشته، برای همه باز است حتی اگر آن رشته را نخریده
+              باشند. برای همین فیلتر روی «رشته+سال» است نه فقط «رشته».
+
+           قبلاً این دو را جمع می‌کردم و نتیجه‌اش نشت بود: کسی که فقط
+           مهندسی خریده بود، همه‌ی ظهورهای آی‌تی و علوم را می‌دید. */
+        $also = $books = [];
         if ($req->user()) {
             $uid   = $req->user()->id;
             $owned = $this->ent->for($uid);
             $also  = $owned ?: $this->ent->demoExams($uid);
+
+            /* دفترچه‌های دموی رشته‌هایی که قبلاً پوشش داده نشده‌اند */
+            $books = array_values(array_filter(
+                $this->ent->trialOn() ? $this->ent->trialBooklets() : [],
+                fn ($b) => !in_array($b['exam'], $also, true)
+            ));
         }
 
         return $this->cached($req, $exam, 'core' . ($year ? "-y$year" : ''),
-                             fn () => $this->content->core($exam, $year, $also), $also);
+                             fn () => $this->content->core($exam, $year, $also, $books), $also, $books);
     }
 
     /**
@@ -105,9 +115,9 @@ class ZabanController extends Controller
      * با no-cache هر بار می‌پرسد، ولی جوابش معمولاً ۳۰۴ خالی است —
      * یک رفت‌وبرگشت ناچیز در ازای اینکه لغو دسترسی واقعاً کار کند.
      */
-    private function cached(Request $req, string $exam, string $part, callable $build, array $also = [])
+    private function cached(Request $req, string $exam, string $part, callable $build, array $also = [], array $books = [])
     {
-        $etag = $this->content->etag($exam, $part, $also);
+        $etag = $this->content->etag($exam, $part, $also, $books);
 
         $headers = [
             'ETag'          => $etag,
