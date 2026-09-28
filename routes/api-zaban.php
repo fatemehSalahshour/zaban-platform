@@ -47,6 +47,10 @@ Route::middleware(['auth:sanctum', 'throttle:zaban-api'])->prefix('api')->group(
     /* ---------- وضعیت کاربر ---------- */
     Route::get('me',      [ZabanController::class, 'me']);
     Route::put('profile', [ZabanController::class, 'profile'])->middleware('throttle:zaban-profile');
+    /* فقط سقف‌های روزانه‌ی مرور — از داشبورد و از پیام «سقف امروز پر شد».
+       PUT profile کل پروفایل را بازنویسی می‌کند؛ این مسیر فقط دو ستون را لمس می‌کند. */
+    Route::match(['get', 'patch'], 'profile/limits', [ZabanController::class, 'limits'])
+         ->middleware('throttle:zaban-profile');
     Route::post('deck',   [ZabanController::class, 'deck']);
     Route::post('star',   [ZabanController::class, 'star']);
     Route::put('note',    [ZabanController::class, 'note']);

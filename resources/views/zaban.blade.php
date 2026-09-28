@@ -564,6 +564,11 @@
 {{-- کد صفحه در public/js/zaban/app.js (جدا کردن کد، قدم ۳). نسخه خودکار از زمان
      تغییر فایل؛ مرورگر آن را جدا از HTML کش می‌کند. --}}
 <script src="/js/zaban/app.js?v={{ filemtime(public_path('js/zaban/app.js')) }}"></script>
+{{-- میانبرهای کیبورد مرور کارت‌ها (Space/Enter = پاسخ، ۱–۴ = امتیاز) --}}
+<script src="/js/zaban/review-keys.js?v={{ filemtime(public_path('js/zaban/review-keys.js')) }}"></script>
+{{-- سقف روزانه‌ی کارت تازه/مرور: پنل داشبورد + پنجره‌ی تغییر سریع
+     (هر عنصر با data-limits-open پنجره را باز می‌کند) --}}
+<script src="/js/zaban/daily-limits.js?v={{ filemtime(public_path('js/zaban/daily-limits.js')) }}"></script>
 {{-- نوار «شما در حساب کاربر هستید» — تنها راه برگشت به حساب مدیر.
      متد banner() نوشته شده بود ولی هیچ‌جا صدا زده نمی‌شد، پس مدیر پس از
      ورود به حساب کاربر راه برگشتی روی صفحه نداشت. --}}

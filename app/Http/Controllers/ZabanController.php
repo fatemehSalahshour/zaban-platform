@@ -721,6 +721,52 @@ class ZabanController extends Controller
         ]]);
     }
 
+    /**
+     * GET|PATCH /api/profile/limits — سقف کارت تازه و مرور در روز.
+     *
+     * PATCH فقط کلیدهایی را که فرستاده شده عوض می‌کند؛ null یعنی «پیش‌فرض مدیر».
+     * بقیه‌ی ستون‌های پروفایل (نام مستعار، معدل، …) دست‌نخورده می‌مانند.
+     */
+    public function limits(Request $req): JsonResponse
+    {
+        $uid = $req->user()->id;
+
+        if ($req->isMethod('patch')) {
+            $d = $req->validate([
+                'new_per_day' => ['nullable', 'integer', 'between:5,100'],
+                'rev_per_day' => ['nullable', 'integer', 'between:10,500'],
+            ], [], ['new_per_day' => 'کارت تازه در روز', 'rev_per_day' => 'مرور در روز']);
+
+            $row = ['updated_at' => now()];
+            foreach (['new_per_day', 'rev_per_day'] as $k) {
+                if ($req->exists($k)) $row[$k] = $d[$k] ?? null;
+            }
+
+            if (DB::table('zaban_profiles')->where('user_id', $uid)->exists()) {
+                DB::table('zaban_profiles')->where('user_id', $uid)->update($row);
+            } else {
+                DB::table('zaban_profiles')->insert($row + [
+                    'user_id' => $uid, 'exam' => 'ce', 'show_in_board' => 0, 'created_at' => now(),
+                ]);
+            }
+        }
+
+        $p = DB::table('zaban_profiles')->where('user_id', $uid)->first();
+
+        return response()->json([
+            'new_per_day' => (int) ($p->new_per_day ?? 0) ?: $this->secSettings->newPerDay(),
+            'rev_per_day' => (int) ($p->rev_per_day ?? 0) ?: $this->secSettings->revPerDay(),
+            /* پیش‌فرض پلتفرم — برای نمایش «خالی = ...» */
+            'new_default' => $this->secSettings->newPerDay(),
+            'rev_default' => $this->secSettings->revPerDay(),
+            /* همان محاسبه‌ی content(): چند کارت امروز برای اولین بار مرور شده */
+            'new_today'   => rescue(fn () => DB::table('review_logs')->where('user_id', $uid)
+                ->select('item_type', 'item_id')->groupBy('item_type', 'item_id')
+                ->havingRaw('MIN(created_at) >= ?', [now()->startOfDay()])
+                ->get()->count(), 0),
+        ]);
+    }
+
     public function deck(Request $req): JsonResponse
     {
         $d = $req->validate([
