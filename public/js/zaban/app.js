@@ -812,6 +812,7 @@ $("#ssub").addEventListener("click",e=>{const b=e.target.closest("[data-ssub]");
     SF.qst=b.dataset.sqst;renderStarQ()});
   const bar=$("#sqbar");if(bar)
   bar.addEventListener("click",e=>{
+    if(e.target.closest("[data-sqhelp]")){sqHelp();return}
     if(!e.target.closest("[data-sqadd]"))return;
     const ks=sqKeys(SF.qst).filter(k=>!deckQ.has(k));
     if(!ks.length){toast("همه‌ی این تست‌ها از قبل در دک مرور شما هستند.");return}
@@ -864,12 +865,42 @@ const SQ_TABS=[
   ["weak",  "هر بار غلط زده‌ام",  h=>h.state==="weak"],
   ["fixed", "جبران شده",         h=>h.state==="fixed"]
 ];
+/* یک خط توضیح برای دسته‌ای که باز است. بدون این، اسم دسته‌ها («اشتباه و نزده»
+   در برابر «هر بار غلط زده‌ام») شبیه هم به نظر می‌رسند و کاربر نمی‌داند
+   کدام را باید جدی بگیرد. */
+const SQ_HINT={
+  star:"تست‌هایی که خودتان ستاره زده‌اید تا بعداً سراغشان بیایید.",
+  open:"تست‌هایی که آخرین بار غلط زدید یا نزدید — هنوز تسویه نشده‌اند. سرِ فهرست، آن‌هایی‌اند که بیشتر اشتباه شده‌اند.",
+  weak:"سرسخت‌ترین‌ها: دو بار یا بیشتر غلط یا نزده بوده‌اند و هیچ‌وقت درستشان نزده‌اید. آزمون دوباره از این‌ها کم فایده دارد؛ اول خودِ کلمه‌ها را کار کنید.",
+  fixed:"قبلاً غلط داشته‌اند ولی دو بار آخر را درست زده‌اید — از فهرست تسویه‌نشده‌ها بیرون آمده‌اند."
+};
 const SQ_EMPTY={
   star:"تستی با این فیلتر در منتخب‌ها نیست.",
   open:"تست تسویه‌نشده‌ای ندارید — یعنی آخرین بار همه را درست زده‌اید.",
   weak:"خوشبختانه تستی نیست که هر بار غلط زده باشید.",
   fixed:"هنوز تستی نیست که قبلاً غلط داشته و دو بار آخر را درست زده باشید."
 };
+/* توضیح کامل شش وضعیت — همان چیزی که روی نشانِ هر تست هم با نگه‌داشتن ماوس می‌آید */
+function sqHelp(){
+  const row=(k,extra)=>`<tr><td><span class="qst q-${QH_CLS[k]}">${QH_FA[k]}</span></td>
+    <td>${QH_TIP[k]}${extra?`<br><span class="capt" style="margin:0">${extra}</span>`:""}</td></tr>`;
+  askInfo("وضعیت تست‌ها یعنی چه؟", `
+    <p class="capt" style="margin:0 0 12px">وضعیت هر تست از تاریخچه‌اش ساخته می‌شود، نه از یک بار اشتباه.
+      تستی که پارسال یک بار غلط زده‌اید و بعدش درست زده‌اید، دیگر در فهرست اشتباه‌ها نمی‌ماند.
+      عدد کنار هر نشان یعنی «چند بار درست، از چند بار».</p>
+    <table class="qsthelp-t">
+      ${row("never")}
+      ${row("weak","در دسته‌ی «هر بار غلط زده‌ام» می‌آیند.")}
+      ${row("open","در دسته‌ی «اشتباه و نزده» می‌آیند.")}
+      ${row("open2")}
+      ${row("fixed","در دسته‌ی «جبران شده» می‌آیند.")}
+      ${row("solid")}
+    </table>
+    <p class="capt" style="margin:12px 0 0">نشان <span class="qst q-sp">سرعت</span> وقتی می‌آید که در تمرین
+      همیشه درست زده‌اید ولی سر آزمونِ زمان‌دار غلط. مسئله‌ی این تست‌ها یادگیری نیست، سرعت است.</p>
+    <p class="capt" style="margin:8px 0 0">تمرین یعنی زدن تک‌تست بیرون از آزمون. آزمون یعنی آزمون آزمایشی
+      تمام‌شده؛ تستی که در آزمون نزده‌اید هم «نزده» ثبت می‌شود.</p>`);
+}
 function sqKeys(tab){
   const t=SQ_TABS.find(x=>x[0]===tab)||SQ_TABS[0];
   if(!t[2])return [...starQ].filter(sfQ);
@@ -888,10 +919,11 @@ function renderStarQ(){
     return `<button data-sqst="${t[0]}" class="${t[0]===tab?"on":""}">${t[1]}<b>${fa(n)}</b></button>`}).join("");
   const bar=$("#sqbar");
   if(bar){
-    bar.hidden=!qs.length;
+    bar.hidden=false;
     const t=SQ_TABS.find(x=>x[0]===tab);
-    bar.innerHTML=qs.length?`<div class="count"><b>${fa(qs.length)}</b> تست در «${t[1]}»</div>
-      <button class="ghost" data-sqadd="1">افزودن همه به دک مرور…</button>`:"";
+    bar.innerHTML=`<div class="count">${qs.length?`<b>${fa(qs.length)}</b> تست در «${t[1]}» · `:""}${SQ_HINT[tab]}
+        <button class="qsthelp" data-sqhelp="1">این دسته‌ها یعنی چه؟</button></div>
+      ${qs.length?`<button class="ghost" data-sqadd="1">افزودن همه به دک مرور…</button>`:""}`;
   }
   $("#starQList").innerHTML=qs.length?qs.map(k=>{const p=k.split("|");return `
     <div class="row" data-openq="${k}">
@@ -899,7 +931,7 @@ function renderStarQ(){
         <span class="word">تست ${fa(p[2])} — کنکور ${fa(p[0])}</span>
         <span class="badge b-once">${p[1]}</span>
         <span class="badge ${qLabel(k)==="وکب"?"b-lvl-1":qLabel(k)==="کلوز تست"?"b-lvl-2":"b-sec-p"}">${qLabel(k)}</span>
-        ${qStateBadge(k,{hideNever:true})}
+        ${qStateBadge(k)}
       </div></div>
       ${qActs(k,"qdeck3")}</div>`}).join(""):`<div class="empty">${SQ_EMPTY[tab]}</div>`;
 }
@@ -1391,7 +1423,7 @@ function renderTestTab(){
              <span class="bk-no">${fa(it.q)}</span>
              <span class="bk-sec">${it.label}</span>
              <span class="bk-cnt">${fa(it.ws.length)} کلمه از بانک</span>
-             ${qStateBadge(qk,{hideNever:true})}
+             ${qStateBadge(qk)}
              <span class="tacts">${grpBtns({y:E.y,e:E.e,q:it.q,keys:keys,rng:""})}</span>
              <span class="go2">دیدن سؤال ←</span></div>`;}).join("")}
     </div>`).join(""):'<div class="empty">با این فیلترها تستی پیدا نشد.</div>';
@@ -3724,7 +3756,7 @@ function qHist(k){
 function qStateBadge(k, opts){
   const H = qHist(k), o = opts || {};
   if(!H.n && o.hideNever) return "";
-  if(!H.n) return `<span class="qst q-n" data-tip="${QH_TIP.never}">${QH_FA.never}</span>`;
+  if(!H.n) return `<span class="qst q-n${o.quiet?" quiet":""}" data-tip="${QH_TIP.never}">${QH_FA.never}</span>`;
   const parts = [`${fa(H.ok)} درست`];
   if(H.bad) parts.push(`${fa(H.bad)} غلط`);
   if(H.bl)  parts.push(`${fa(H.bl)} نزده`);
