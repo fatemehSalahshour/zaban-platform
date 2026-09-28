@@ -32,6 +32,8 @@ Route::get('/', function (\App\Services\Pricing $pricing, \App\Services\LandingF
         /* اعداد و کلمه‌های نمونه از خود بانک — قبلاً در HTML و landing.js ثابت بودند */
         'facts'    => $facts->facts(),
         'words'    => $facts->words(),
+        /* دفترچه‌ی نمونه‌ی بخش آزمون: سؤال‌های واقعی وکب، بدون کلید پاسخ */
+        'sample'   => $facts->sampleBooklet(),
     ]);
 })->name('home');
 

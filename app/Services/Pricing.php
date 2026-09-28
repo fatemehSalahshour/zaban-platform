@@ -61,8 +61,12 @@ class Pricing
 
             $left = null;
             if ($active && $to) {
-                /* روزهای باقی‌مانده، رو به بالا — «۱ روز مانده» تا لحظه‌ی پایان */
-                $left = max(0, (int) ceil($now->floatDiffInDays(\Illuminate\Support\Carbon::parse($to), false)));
+                /* روزهای تقویمی تا روز پایان، نه کسر روز.
+                   قبلاً کسری رو به بالا گرد می‌شد: بعدازظهر ۶ مهر با پایانِ
+                   ۲۰ مهر «۱۵ روز» نشان می‌داد، در حالی که ۱۴ روز است. حالا
+                   ۲۰ مهر یعنی ۱۴، و خودِ روز آخر صفر (= «امروز آخرین روز»). */
+                $left = max(0, $now->copy()->startOfDay()
+                    ->diffInDays(\Illuminate\Support\Carbon::parse($to)->startOfDay(), false));
             }
 
             /* متن از پنل می‌آید تا برای هر مناسبتی («تخفیف نوروزی»، «تخفیف

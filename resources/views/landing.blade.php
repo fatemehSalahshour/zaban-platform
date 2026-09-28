@@ -230,16 +230,15 @@
       </div>
     </div>
     <div class="booklet">
-      <div class="booklet-h"><b>کنکور ۱۴۰۵ · مهندسی کامپیوتر</b><span class="timer" id="timer">۳۰:۰۰</span></div>
-      <div class="struct">
-        <div class="v">وکب<small>۱ تا ۷</small></div>
-        <div class="c">کلوز<small>۸ تا ۱۰</small></div>
-        <div class="p">پسیج ۱<small>۱۱ تا ۱۵</small></div>
-        <div class="p">پسیج ۲<small>۱۶ تا ۲۰</small></div>
-        <div class="p">پسیج ۳<small>۲۱ تا ۲۵</small></div>
+      <div class="booklet-h">
+        <b>کنکور {{ \App\Support\FaNum::format($sample['year'] ?? 1405) }} · {{ $sample['exam'] ?? 'مهندسی کامپیوتر' }}</b>
+        <span class="timer" id="timer">۳۰:۰۰</span>
       </div>
+      {{-- نوار ساختار دفترچه و سؤال‌ها را landing.js از داده‌ی واقعی می‌سازد --}}
+      <div class="struct" id="struct"></div>
+      <div class="qbox" id="qbox"></div>
       <div class="bubbles" id="bubbles" role="group" aria-label="پاسخ‌برگ نمونه"></div>
-      <div class="sheet-foot"><span id="sheetMsg">روی گزینه‌ها بزن؛ زمان‌سنج با اولین پاسخ راه می‌افتد.</span><button type="button" id="sheetReset">از نو</button></div>
+      <div class="sheet-foot"><span id="sheetMsg">یک گزینه بزن؛ زمان‌سنج با اولین پاسخ راه می‌افتد.</span><button type="button" id="sheetReset">از نو</button></div>
     </div>
   </div>
 </section>
@@ -399,6 +398,9 @@ window.LANDING_EXAM = @json($examDate);
    landing.js خودش به نمونه‌ی داخلی‌اش برمی‌گردد و صفحه خالی نمی‌ماند. */
 window.LANDING_WORDS = @json($words);
 window.LANDING_YEARS = @json([$facts['y1'], $facts['y2']]);
+/* دفترچه‌ی نمونه: سؤال‌های واقعی وکب، ساختار دفترچه و تعداد کل سؤال‌ها.
+   کلید پاسخ عمداً در این خروجی نیست — پاسخ درست و کارنامه داخل پلتفرم است. */
+window.LANDING_SAMPLE = @json($sample);
 </script>
 <script src="/js/landing.js?v={{ filemtime(public_path('js/landing.js')) }}"></script>
 </body>

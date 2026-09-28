@@ -109,27 +109,105 @@
     [].forEach.call(document.querySelectorAll('.board .seg button'), function(x){ x.setAttribute('aria-pressed', x===b); }); drawP(+b.dataset.m); }; });
   drawP(0);
 
-  /* ---------- پاسخ‌برگ ---------- */
-  var bub = document.getElementById('bubbles'), tel = document.getElementById('timer'), msg = document.getElementById('sheetMsg');
-  var T0 = 30*60, t = T0, tick = null, ans = {};
-  function clock(){ var m=Math.floor(t/60), s=t%60; tel.textContent = fa(m)+':'+(s<10?'۰':'')+fa(s); }
-  function status(){ var n = Object.keys(ans).length;
-    msg.innerHTML = n ? 'پاسخ‌داده: <b>'+fa(n)+'</b> از ۱۵ سؤال نمونه. در پلتفرم، کل ۲۵ سؤال با متن کامل می‌آید.' : 'روی گزینه‌ها بزن؛ زمان‌سنج با اولین پاسخ راه می‌افتد.'; }
-  for (var q=1;q<=15;q++){
-    var h = '<div><span>'+fa(q)+'</span>';
-    for (var o=1;o<=4;o++) h += '<button type="button" data-q="'+q+'" data-o="'+o+'" aria-label="سؤال '+fa(q)+'، گزینه‌ی '+fa(o)+'" aria-pressed="false">'+fa(o)+'</button>';
-    bub.insertAdjacentHTML('beforeend', h+'</div>');
+  /* ---------- دفترچه‌ی نمونه ----------
+     سؤال‌های واقعی وکب همان دفترچه، از سرور (window.LANDING_SAMPLE). کلید
+     پاسخ در این داده نیست و عمداً هم نباید باشد: صفحه عمومی است و پاسخ درست
+     و کارنامه داخل پلتفرم است.
+
+     تا نسخه‌ی قبل اینجا فقط حباب‌های گزینه بود، بدون هیچ متن سؤالی — روی
+     موبایل که فقط همین کارت دیده می‌شود، شبیه یک پاسخ‌برگ خالی بود. */
+  var SB   = window.LANDING_SAMPLE || {};
+  var QS   = (SB.questions && SB.questions.length) ? SB.questions : [];
+  var bub  = document.getElementById('bubbles'),
+      tel  = document.getElementById('timer'),
+      msg  = document.getElementById('sheetMsg'),
+      qbox = document.getElementById('qbox'),
+      stru = document.getElementById('struct');
+  var T0 = 30*60, t = T0, tick = null, ans = {}, at = 0;
+
+  /* نوار ساختار — از خود دفترچه، نه عددهای ثابت قالب */
+  if (stru){
+    var CLS = {'وکب':'v','کلوز تست':'c'};
+    stru.innerHTML = (SB.struct||[]).map(function(g){
+      return '<div class="'+(CLS[g.label]||'p')+'">'+g.label+
+             '<small>'+fa(g.from)+' تا '+fa(g.to)+'</small></div>';
+    }).join('');
   }
-  bub.addEventListener('click', function(e){
-    var b = e.target.closest('button'); if(!b) return;
-    var q = b.dataset.q, row = b.parentNode.querySelectorAll('button'), was = b.classList.contains('f');
-    [].forEach.call(row, function(x){ x.classList.remove('f'); x.setAttribute('aria-pressed','false'); });
-    if (was) delete ans[q]; else { b.classList.add('f'); b.setAttribute('aria-pressed','true'); ans[q]=+b.dataset.o; }
-    if (!tick && !reduce) tick = setInterval(function(){ if (t>0){ t--; clock(); } else { clearInterval(tick); msg.textContent='وقت تمام شد. در پلتفرم اینجا کارنامه و پاسخ‌برگ کامل می‌آید.'; } }, 1000);
-    status();
-  });
-  document.getElementById('sheetReset').onclick = function(){ clearInterval(tick); tick=null; t=T0; ans={}; clock();
-    [].forEach.call(bub.querySelectorAll('button'), function(x){ x.classList.remove('f'); x.setAttribute('aria-pressed','false'); }); status(); };
+
+  function clock(){ var m=Math.floor(t/60), s=t%60; tel.textContent = fa(m)+':'+(s<10?'۰':'')+fa(s); }
+
+  function status(){
+    var n = Object.keys(ans).length, total = SB.total || 25;
+    msg.innerHTML = n
+      ? 'پاسخ‌داده: <b>'+fa(n)+'</b> از '+fa(QS.length)+' سؤال نمونه. پاسخ درست و کارنامه در پلتفرم.'
+      : 'یک گزینه بزن؛ زمان‌سنج با اولین پاسخ راه می‌افتد.';
+  }
+
+  function startTick(){
+    if (tick || reduce) return;
+    tick = setInterval(function(){
+      if (t>0){ t--; clock(); }
+      else { clearInterval(tick); msg.textContent='وقت تمام شد. در پلتفرم اینجا کارنامه و پاسخ‌برگ کامل می‌آید.'; }
+    }, 1000);
+  }
+
+  /* یک سؤال در لحظه: متن کامل با گزینه‌هایش. پاسخ‌برگ پایین، نقشه‌ی حرکت است. */
+  function drawQ(){
+    if (!qbox || !QS.length) return;
+    var q = QS[at], pick = ans[q.n];
+    qbox.innerHTML =
+      '<div class="qh"><span>سؤال <b>'+fa(q.n)+'</b> از دفترچه</span>'+
+        '<span class="qnav">'+
+          '<button type="button" data-step="-1" aria-label="سؤال قبلی"'+(at===0?' disabled':'')+'>‹</button>'+
+          '<button type="button" data-step="1" aria-label="سؤال بعدی"'+(at===QS.length-1?' disabled':'')+'>›</button>'+
+        '</span></div>'+
+      '<p class="qstem" lang="en" dir="ltr">'+q.stem+'</p>'+
+      '<div class="qopts">'+ q.opts.map(function(o,i){
+        return '<button type="button" class="qopt'+(pick===i+1?' f':'')+'" data-o="'+(i+1)+'"'+
+               ' aria-pressed="'+(pick===i+1)+'"><span class="n">'+fa(i+1)+'</span>'+
+               '<span class="tx" lang="en" dir="ltr">'+o+'</span></button>';
+      }).join('') +'</div>';
+  }
+
+  function paintBubbles(){
+    if (!bub) return;
+    bub.innerHTML = QS.map(function(q,i){
+      var pick = ans[q.n];
+      return '<div'+(i===at?' class="on"':'')+'><span>'+fa(q.n)+'</span>'+
+        [1,2,3,4].map(function(o){
+          return '<button type="button" data-q="'+q.n+'" data-i="'+i+'" data-o="'+o+'"'+
+                 ' class="'+(pick===o?'f':'')+'" aria-pressed="'+(pick===o)+'"'+
+                 ' aria-label="سؤال '+fa(q.n)+'، گزینه‌ی '+fa(o)+'">'+fa(o)+'</button>';
+        }).join('') + '</div>';
+    }).join('');
+  }
+
+  function answer(n, o){
+    if (ans[n] === o) delete ans[n]; else ans[n] = o;
+    startTick(); drawQ(); paintBubbles(); status();
+  }
+
+  if (QS.length){
+    if (qbox) qbox.addEventListener('click', function(e){
+      var nav = e.target.closest('[data-step]');
+      if (nav){ at = Math.min(QS.length-1, Math.max(0, at + (+nav.dataset.step))); drawQ(); paintBubbles(); return; }
+      var b = e.target.closest('.qopt');
+      if (b) answer(QS[at].n, +b.dataset.o);
+    });
+    if (bub) bub.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if (!b) return;
+      at = +b.dataset.i; answer(+b.dataset.q, +b.dataset.o);
+    });
+    drawQ(); paintBubbles();
+  } else if (qbox){
+    /* بانک خالی یا خطای کوئری — کارت بی‌ریخت نماند */
+    qbox.innerHTML = '<p class="qstem">نمونه‌ی سؤال‌ها در خود پلتفرم است.</p>';
+  }
+
+  var rs = document.getElementById('sheetReset');
+  if (rs) rs.onclick = function(){
+    clearInterval(tick); tick=null; t=T0; ans={}; at=0; clock(); drawQ(); paintBubbles(); status();
+  };
   clock();
 
   /* ---------- ماشین‌حساب ---------- */

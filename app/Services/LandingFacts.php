@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
  */
 class LandingFacts
 {
-    public const CACHE_KEYS = ['zaban.landing.facts', 'zaban.landing.words'];
+    public const CACHE_KEYS = ['zaban.landing.facts', 'zaban.landing.words', 'zaban.landing.sample'];
 
     /** سطح فارسی ← همان اندیسی که landing.js انتظار دارد (۰ ساده … ۲ پیشرفته) */
     private const LEVEL = ['ساده' => 0, 'متوسط' => 1, 'پیشرفته' => 2];
@@ -100,6 +100,81 @@ class LandingFacts
                 ];
             }
             return $out;
+        });
+    }
+
+    /**
+     * دفترچه‌ی نمونه‌ی لندینگ — سؤال‌های واقعی، بدون کلید پاسخ.
+     *
+     * تا این نسخه، پاسخ‌برگ لندینگ فقط حباب‌های گزینه بود و هیچ متن سؤالی
+     * نداشت؛ روی موبایل که فقط همان کارت دیده می‌شود، ناقص به نظر می‌رسید.
+     *
+     * دو تصمیم عمدی:
+     *   ۱) فقط سؤال‌های «وکب». کلوز و پسیج بدون متنشان بی‌معنی‌اند و متن
+     *      کامل جای دیگری است — در خود پلتفرم.
+     *   ۲) کلید پاسخ اینجا نمی‌آید. صفحه‌ی عمومی است و پاسخ درست، کارنامه و
+     *      تشریح همگی داخل پلتفرم‌اند.
+     *
+     * دفترچه از میان دفترچه‌های آزمایشی مدیر انتخاب می‌شود (همان‌هایی که در
+     * نسخه‌ی نمایشی هم باز است)، وگرنه تازه‌ترین دفترچه‌ی مهندسی کامپیوتر.
+     *
+     * @return array{year:?int, exam:?string, struct:list<array{label:string,from:int,to:int}>,
+     *               questions:list<array{n:int, stem:string, opts:list<string>}>, total:int}
+     */
+    public function sampleBooklet(int $limit = 8): array
+    {
+        return Cache::remember('zaban.landing.sample', 1800, function () use ($limit) {
+            $pick = null;
+            foreach (app(Entitlements::class)->trialBooklets() as $b) {
+                if (DB::table('questions')->where(['year' => $b['year'], 'exam' => $b['exam']])->exists()) {
+                    $pick = $b; break;
+                }
+            }
+            if (!$pick) {
+                $row = DB::table('questions')->where('exam', 'ce')
+                    ->orderByDesc('year')->first(['year', 'exam']);
+                if (!$row) return ['year' => null, 'exam' => null, 'struct' => [], 'questions' => [], 'total' => 0];
+                $pick = ['year' => (int) $row->year, 'exam' => $row->exam];
+            }
+
+            $all = DB::table('questions')->where(['year' => $pick['year'], 'exam' => $pick['exam']])
+                ->orderBy('question_number')
+                ->get(['id', 'question_number', 'section', 'passage_number', 'stem']);
+
+            /* نوار ساختار دفترچه — از خود داده، نه عددهای ثابت داخل قالب */
+            $struct = [];
+            foreach ($all as $q) {
+                $label = (ContentBuilder::SEC_FA[$q->section] ?? $q->section)
+                       . ($q->section === 'passage' && $q->passage_number ? ' ' . $q->passage_number : '');
+                $n = (int) $q->question_number;
+                if (!isset($struct[$label])) $struct[$label] = ['label' => $label, 'from' => $n, 'to' => $n];
+                else $struct[$label]['to'] = max($struct[$label]['to'], $n);
+            }
+
+            $vocab = $all->where('section', 'vocab')->take($limit)->values();
+            $opts  = [];
+            if ($vocab->isNotEmpty()) {
+                /* is_correct عمداً خوانده نمی‌شود — این خروجی عمومی است */
+                DB::table('question_options')->whereIn('question_id', $vocab->pluck('id'))
+                    ->orderBy('question_id')->orderBy('position')
+                    ->get(['question_id', 'position', 'body'])
+                    ->each(function ($o) use (&$opts) { $opts[$o->question_id][] = (string) $o->body; });
+            }
+
+            $questions = [];
+            foreach ($vocab as $q) {
+                $o = $opts[$q->id] ?? [];
+                if (count($o) !== 4 || trim((string) $q->stem) === '') continue;
+                $questions[] = ['n' => (int) $q->question_number, 'stem' => (string) $q->stem, 'opts' => $o];
+            }
+
+            return [
+                'year'      => (int) $pick['year'],
+                'exam'      => ContentBuilder::EXAM_FA[$pick['exam']] ?? $pick['exam'],
+                'struct'    => array_values($struct),
+                'questions' => $questions,
+                'total'     => $all->count(),
+            ];
         });
     }
 }

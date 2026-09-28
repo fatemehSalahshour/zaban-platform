@@ -245,7 +245,29 @@ h1,h2,h3,p{margin:0}
 .exam-facts{display:flex;gap:26px;flex-wrap:wrap;margin-top:24px;font-size:15px;color:var(--n-ink-2)}
 .exam-facts span:before{content:'◆';color:var(--n-gold);font-size:9px;margin-inline-end:8px;vertical-align:middle}
 @media(max-width:980px){.exam .wrap{grid-template-columns:1fr;gap:44px}}
-@media(max-width:520px){.booklet{padding:20px}.bubbles{grid-template-columns:repeat(2,1fr);gap:12px 14px}.bubbles div:nth-child(n+11){display:none}.booklet-h b{font-size:20px}.timer{font-size:26px}.modes{grid-template-columns:1fr}.struct div{padding:0 7px;font-size:12px}}
+/* کارت سؤال نمونه — متن واقعی سؤال بالای پاسخ‌برگ */
+.qbox{margin-top:22px;border:1px solid var(--n-line);border-radius:8px;padding:18px}
+.qbox .qh{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  font-size:13px;color:var(--n-ink-3);margin-bottom:12px}
+.qbox .qh b{color:var(--n-gold-hi);font-weight:500}
+.qbox .qnav{display:flex;gap:6px}
+.qbox .qnav button{width:28px;height:28px;border:1px solid var(--n-line-2);background:none;
+  color:var(--n-ink-2);border-radius:8px;font-size:16px;line-height:1}
+.qbox .qnav button:hover:not(:disabled){border-color:var(--n-gold);color:#fff}
+.qbox .qnav button:disabled{opacity:.35}
+.qstem{font-size:15px;line-height:2;color:#f4ead2;margin-bottom:14px}
+.qopts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.qopt{display:flex;align-items:center;gap:8px;text-align:start;padding:9px 11px;
+  border:1px solid var(--n-line-2);background:none;border-radius:8px;color:var(--n-ink-2);
+  font-family:inherit;font-size:14px;transition:border-color .15s,background .15s,color .15s}
+.qopt:hover{border-color:var(--n-gold);color:#fff}
+.qopt.f{background:var(--n-gold);border-color:var(--n-gold);color:#1b1505}
+.qopt .n{flex:none;width:20px;height:20px;border-radius:50%;border:1px solid currentColor;
+  display:flex;align-items:center;justify-content:center;font-size:10.5px}
+.qopt .tx{min-width:0}
+.bubbles div.on span{color:var(--n-gold-hi)}
+
+@media(max-width:520px){.booklet{padding:20px}.bubbles{grid-template-columns:repeat(2,1fr);gap:12px 14px}.booklet-h b{font-size:20px}.timer{font-size:26px}.modes{grid-template-columns:1fr}.struct div{padding:0 7px;font-size:12px}.qopts{grid-template-columns:1fr}}
 
 /* ============ فرهنگ امکانات ============ */
 .lexicon .cols{columns:2;column-gap:70px;column-rule:1px solid var(--line)}
