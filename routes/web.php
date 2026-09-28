@@ -16,9 +16,10 @@ use App\Http\Controllers\ZabanAdminAlertController;
 Route::get('/', function (\App\Services\Pricing $pricing, \App\Services\LandingFacts $facts) {
     if (auth()->check()) return redirect()->route('zaban');
 
-    /* قیمت هر سه رشته، با تخفیف رونمایی اگر فعال باشد — وگرنه عددِ لندینگ
-       با مبلغ صفحه‌ی خرید نمی‌خواند و کاربر حس می‌کند قیمت عوض شده. */
-    $q = $pricing->quote(\App\Services\Entitlements::EXAMS);
+    /* قیمت «دسترسی کامل به یک رشته»، با تخفیف رونمایی اگر فعال باشد — وگرنه
+       عددِ لندینگ با مبلغ صفحه‌ی خرید نمی‌خواند و کاربر حس می‌کند قیمت عوض
+       شده. قیمت تک‌رشته برای هر سه رشته یکی است، پس اولی را می‌گیریم. */
+    $q = $pricing->quote([\App\Services\Entitlements::EXAMS[0]]);
 
     return view('landing', [
         /* عدد فارسی با جداکننده‌ی فارسی — بقیه‌ی صفحه هم با رقم فارسی است */
