@@ -769,6 +769,19 @@ html[data-theme="dim"] .dashbtn.on,html[data-theme="dark"] .dashbtn.on{
 .ex-ws button.in .en{color:var(--accent)}
 /* سربرگ گروه: عنوان راست، دکمه چپ، در یک خط */
 .ex-wg{margin-top:14px}
+/* گروه جمع‌شونده‌ی کلمات متن پسیج/کلوز — بسته می‌ماند تا پاسخ تشریحی و
+   کلمات خود سؤال از دید بیرون نروند. */
+.ex-wg.fold{border:1px solid var(--line);border-radius:10px;padding:0 11px}
+.ex-wg.fold > summary{list-style:none;cursor:pointer;display:flex;align-items:center;
+  gap:8px;padding:9px 0;font-size:12.5px;color:var(--ink-2)}
+.ex-wg.fold > summary::-webkit-details-marker{display:none}
+.ex-wg.fold > summary .t{font-weight:500}
+.ex-wg.fold > summary .ch{margin-right:auto;font-style:normal;color:var(--ink-3);transition:.15s}
+.ex-wg.fold[open] > summary .ch{transform:rotate(180deg)}
+.ex-wg.fold[open] > summary{border-bottom:1px solid var(--line)}
+.ex-wg.fold > .th{margin-top:9px}
+.ex-wg.fold > .th .t{display:none}
+.ex-wg.fold > .ex-ws{padding-bottom:11px}
 .ex-wg .th{display:flex;align-items:center;gap:10px;margin-bottom:2px}
 .ex-wg .th .t{font-size:11.5px;color:var(--ink-3)}
 .ex-wg .th button{margin-right:auto}

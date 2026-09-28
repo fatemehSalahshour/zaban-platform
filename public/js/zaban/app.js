@@ -999,6 +999,8 @@ function makeQ(y,e,q){
   if(!real)return null;
   return {
     qid: real.id, ws: (real.words.stem||[]).map(id=>WBYID[id]).filter(Boolean),
+    /* کلمات خودِ متن پسیج/کلوز — جدا از صورت سؤال، چون ده‌ها تاست */
+    pws: (real.words.passage||[]).map(id=>WBYID[id]).filter(Boolean),
     main: WBYID[(real.words.option||[])[0]] || null,
     sec: real.sec, p: real.p, view: real.view || 3, stem: real.stem||"", stemFa: real.stemFa||"",
     opts: real.opts.map((body,i)=>{
@@ -3029,17 +3031,28 @@ function allWordsOf(Q){
   Q.opts.concat(Q.ws).forEach(w=>{if(!seen[w.w]){seen[w.w]=1;out.push(w)}});
   return out;
 }
-function wordChips(list,title){
+function wordChips(list, title, opts){
+  list = (list||[]).filter(Boolean);
   if(!list.length)return "";
-  const inAll=list.every(w=>deck.has(w.w));
-  return `<div class="ex-wg"><div class="th"><span class="t">${title} (${fa(list.length)})</span>
-      <button class="ib ib-l ${inAll?"ondeck":""}" data-tdeck="${list.map(w=>w.w).join(",")}">${inAll?"✓ در دک":"+ این "+fa(list.length)+" کلمه به دک"}</button></div>
-    <div class="ex-ws">${list.map(w=>`<button data-w="${w.w}" class="${deck.has(w.w)?"in":""}"
+  const o = opts||{};
+  const inAll = list.every(w=>deck.has(w.w));
+  const body = `<div class="ex-ws">${list.map(w=>`<button data-w="${w.w}" class="${deck.has(w.w)?"in":""}"
         data-tip="برای دیدن کارت کامل «${w.w}» بزنید">
         <bdi class="en">${w.w}</bdi>
         <span class="fa">${cleanFa(w.fa)||"—"}</span>
         ${deck.has(w.w)?'<i class="dk">در دک</i>':""}
-      </button>`).join("")}</div></div>`;
+      </button>`).join("")}</div>`;
+  const head = `<div class="th"><span class="t">${title} (${fa(list.length)})</span>
+      <button class="ib ib-l ${inAll?"ondeck":""}" data-tdeck="${list.map(w=>w.w).join(",")}">${inAll?"✓ در دک":"+ این "+fa(list.length)+" کلمه به دک"}</button></div>`;
+
+  /* فهرست کلمات متن پسیج/کلوز معمولاً ده‌ها تاست و اگر باز بماند، پاسخ
+     تشریحی و کلمات خود سؤال را از دید بیرون می‌راند. پس جمع‌شونده است. */
+  if(o.fold)
+    return `<details class="ex-wg fold" ${o.open?"open":""}>
+      <summary><span class="t">${title} (${fa(list.length)})</span><i class="ch">▾</i></summary>
+      ${head}${body}</details>`;
+
+  return `<div class="ex-wg">${head}${body}</div>`;
 }
 /* یک خط آمار جمعی، همیشه دیده می‌شود.
    عدد از qGlobal می‌آید — همان چیزی که پشت دکمه‌ی «آمار این تست» بود.
@@ -3063,6 +3076,11 @@ function crowdLine(y,e,q,ans){
 function answerBox(it){
   const Q=it.Q, optW=Q.opts.map(o=>o.w);
   const stemWs=Q.ws.filter(w=>optW.indexOf(w.w)<0);
+  /* کلمات متن، بدون آن‌هایی که قبلاً در گزینه‌ها یا صورت سؤال آمده‌اند —
+     تکرار یک کلمه در دو فهرست فقط شلوغی است. */
+  const seen={}; Q.opts.concat(stemWs).forEach(w=>seen[w.w]=1);
+  const passWs=(Q.pws||[]).filter(w=>!seen[w.w]);
+
   if (Q.ans == null || !Q.opts[Q.ans]) {
     return `<div class="ex-ans wait">${ansWaitMsg(Q)}</div>`;
   }
@@ -3072,7 +3090,8 @@ function answerBox(it){
     ${crowdLine(it.y ?? EX.y, it.e ?? EX.e, it.q, Q.ans)}
     <div class="ex-exp"><span class="t">پاسخ تشریحی</span>${explainOf(Q)}</div>
     ${wordChips(Q.opts,"کلمات گزینه‌ها")}
-    ${wordChips(stemWs,"کلمات صورت سؤال و متن")}`;
+    ${wordChips(stemWs,"کلمات صورت سؤال")}
+    ${wordChips(passWs, Q.sec==="کلوز تست" ? "کلمات متن کلوز" : "کلمات متن پسیج", {fold:true})}`;
 }
 function qTools(it,big){
   const Q=it.Q,R=EX.res,a=EX.ans[it.q];

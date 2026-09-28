@@ -311,6 +311,22 @@ class ImportZaban extends Command
             SELECT oc.question_id, oc.word_id, 'stem'
             FROM word_occurrences oc WHERE oc.question_id IS NOT NULL");
 
+        /* کلمه‌هایی که در خودِ متن پسیج یا کلوز آمده‌اند (source='text')، نه در
+           صورت سؤال. این‌ها question_id ندارند — با سال، رشته، بخش و شماره‌ی
+           پسیج به همه‌ی سؤال‌های همان متن وصل می‌شوند.
+
+           جدا نگه داشتنشان از 'stem' لازم است: صورت سؤال چند کلمه دارد ولی
+           متن پسیج ده‌ها کلمه، و قاتی کردنشان فهرستی می‌سازد که کاربر در آن
+           نمی‌فهمد کدام کلمه در خود سؤال بوده. */
+        DB::statement("
+            INSERT IGNORE INTO question_words (question_id, word_id, role)
+            SELECT q.id, oc.word_id, 'passage'
+            FROM word_occurrences oc
+            JOIN questions q
+              ON q.year = oc.year AND q.exam = oc.exam AND q.section = oc.section
+             AND (q.passage_number <=> oc.passage_number)
+            WHERE oc.source = 'text' AND oc.section IN ('cloze','passage')");
+
         $this->line('۶) بررسی‌های سلامت:');
         $this->checks();
         $this->info('تمام شد. حالا: php artisan zaban:predict && php artisan cache:clear');
