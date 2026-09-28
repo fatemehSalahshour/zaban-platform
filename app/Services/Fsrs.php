@@ -62,12 +62,27 @@ class Fsrs
      * پیش از جلسه برمی‌گردد.
      *
      * روز آخر عمداً کنار گذاشته می‌شود: مرور در خودِ روز کنکور فایده‌ای ندارد.
+     *
+     * ورودی هم شیء تاریخ را می‌پذیرد هم رشته‌ی میلادی. امضای قبلی فقط
+     * DateTimeInterface بود، ولی تنها فراخواننده‌اش Pricing::accessUntil()
+     * است که رشته برمی‌گرداند — نتیجه‌اش TypeError روی هر ثبت مرور بود:
+     * کارت روی صفحه حرکت می‌کرد، /api/review خطای ۵۰۰ می‌داد، و چون شکستش
+     * بی‌صدا بلعیده می‌شد، همه‌ی کارت‌های مرورشده با اولین نوسازی برمی‌گشتند.
+     *
+     * @param \DateTimeInterface|string|null $examDate
      */
-    public function horizon(?\DateTimeInterface $examDate): static
+    public function horizon($examDate = null): static
     {
         if (!$examDate) { $this->horizonDays = null; return $this; }
 
-        $days = (int) floor((strtotime($examDate->format('Y-m-d')) - strtotime(date('Y-m-d'))) / 86400) - 1;
+        $ymd = $examDate instanceof \DateTimeInterface
+            ? $examDate->format('Y-m-d')
+            : substr(trim((string) $examDate), 0, 10);
+
+        $ts = strtotime($ymd);
+        if ($ts === false) { $this->horizonDays = null; return $this; }
+
+        $days = (int) floor(($ts - strtotime(date('Y-m-d'))) / 86400) - 1;
         $this->horizonDays = max(1, $days);
         return $this;
     }

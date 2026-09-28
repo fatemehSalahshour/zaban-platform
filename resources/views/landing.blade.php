@@ -323,6 +323,10 @@
       <div class="buy">
         <h3>دسترسی کامل</h3>
         {{-- قیمت و لینک خرید از سرور: جدول قیمت پنل مدیریت (Pricing) --}}
+        @if ($wasPrice)
+          <div class="off-tag">{{ \App\Support\FaNum::format($launchPct) }}٪ تخفیف رونمایی</div>
+          <div class="was">{{ $wasPrice }}</div>
+        @endif
         <div class="price">{{ $price }}</div>
         <div class="price-sub">تومان — هر سه رشته، تا روز کنکور</div>
         <a class="btn btn-foil" href="{{ route('buy') }}">خرید و شروع مرور</a>

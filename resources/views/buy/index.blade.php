@@ -9,6 +9,10 @@
   :root{--ok:#1d6b58;--ok-soft:#e6f2ee;--danger:#a8461f;--danger-soft:#fbe4dc}
 
   .buyhead{font-size:24px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+  .launch{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fdeed3;
+       border:1px solid var(--gold-line);border-radius:12px;padding:11px 15px;margin-bottom:16px}
+  .launch b{font-size:15px;color:#8a5206}
+  .launch span{font-size:13px;color:#8a5206;opacity:.85;margin-right:auto}
   .buylead{color:var(--ink-2);margin-bottom:22px}
 
   .buygrid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;align-items:start}
@@ -64,6 +68,17 @@
 @section('body')
   <h2 class="buyhead">پکیج خود را انتخاب کنید</h2>
   <p class="buylead">هر پکیج شامل کل کلمات {{ \App\Support\FaNum::format(max(array_column($stats, 'years')) ?: 0) }} سال همان رشته است. با انتخاب چند رشته، تخفیف پلکانی خودکار اعمال می‌شود.</p>
+
+  @if (!empty($launch['active']))
+    <div class="launch">
+      <b>{{ \App\Support\FaNum::format($launch['percent']) }}٪ تخفیف رونمایی</b>
+      @if ($launch['days_left'] !== null)
+        <span>{{ $launch['days_left'] > 0
+          ? \App\Support\FaNum::format($launch['days_left']) . ' روز تا پایان'
+          : 'امروز آخرین روز است' }}</span>
+      @endif
+    </div>
+  @endif
 
   @if ($fake)<div class="dev">محیط توسعه: درگاه آزمایشی روشن است و پولی جابه‌جا نمی‌شود.</div>@endif
   @if (session('buy_error'))<div class="err" role="alert">{{ session('buy_error') }}</div>@endif
@@ -179,8 +194,11 @@
       const q=await r.json(); if(my!==seq)return;
 
       lines.innerHTML=(q.lines||[]).map(l=>`<div class="line"><span>${l.name}</span><b>${money(l.price)}</b></div>`).join('')
-        +(q.discount>0?`<div class="line off"><span>تخفیف پلکانی</span><b>− ${money(q.discount)}</b></div>`
-                      :`<div class="line off"><span>تخفیف پلکانی</span><b>− ۰</b></div>`);
+        +(q.launch_off>0
+            ? `<div class="line off"><span>تخفیف پلکانی</span><b>− ${money(q.list_price-q.bundle_price)}</b></div>`
+              +`<div class="line off"><span>تخفیف رونمایی (${Number(q.launch_pct).toLocaleString('fa-IR')}٪)</span><b>− ${money(q.launch_off)}</b></div>`
+            : (q.discount>0?`<div class="line off"><span>تخفیف پلکانی</span><b>− ${money(q.discount)}</b></div>`
+                           :`<div class="line off"><span>تخفیف پلکانی</span><b>− ۰</b></div>`));
 
       totalEl.innerHTML=money(q.payable)+' <span style="font-size:13px;font-weight:400">تومان</span>';
       if(q.discount>0){ wasEl.textContent=money(q.list_price)+' تومان'; wasEl.hidden=false; }

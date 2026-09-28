@@ -73,6 +73,7 @@ class ZabanPurchaseController extends Controller
                 : null,
             'pre'     => array_values(array_diff(array_intersect($pre, array_keys(Pricing::NAMES)), $owned)),
             'bundles' => $this->pricing->bundles(),
+            'launch'  => $this->pricing->launchOffer(),
             'stats'   => $this->pricing->examStats(),
             'until'   => $this->pricing->accessUntil(),
             'fake'    => $this->gateway->fake(),

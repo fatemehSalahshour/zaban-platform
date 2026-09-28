@@ -143,6 +143,7 @@ class ZabanAdminController extends Controller
 
         return view('zaban-admin.settings', [
             'bundles'   => $pricing->bundles(),
+            'launch'    => $pricing->launchOffer(),
             'version'   => $pricing->version(),
             /* نمایش به شمسی؛ ذخیره میلادی */
             'examDate'  => \App\Support\Jalali::formatFromGregorian($pricing->accessUntil()),
@@ -151,6 +152,7 @@ class ZabanAdminController extends Controller
             'trialBooks'=> $ent->trialBooklets(),
             'sec'       => app(\App\Services\Security\Settings::class)->all(),
             'newPerDay' => app(\App\Services\Security\Settings::class)->newPerDay(),
+            'revPerDay' => app(\App\Services\Security\Settings::class)->revPerDay(),
             'secFields' => \App\Services\Security\Settings::FIELDS,
 
             'qCount'    => $qCount,
@@ -168,15 +170,39 @@ class ZabanAdminController extends Controller
             'sec'          => ['nullable', 'array'],
             'sec.*'        => ['nullable', 'integer'],     /* کمینه/بیشینه را Settings::save اعمال می‌کند */
             'new_per_day'  => ['nullable', 'integer'],
+            'rev_per_day'  => ['nullable', 'integer'],
             'p1' => ['required', 'integer', 'min:0', 'max:100000000'],
             'p2' => ['required', 'integer', 'min:0', 'max:100000000'],
             'p3' => ['required', 'integer', 'min:0', 'max:100000000'],
             'exam_date' => ['nullable', 'string', 'max:30'],
+            /* تخفیف رونمایی — درصد و بازه‌ی شمسی */
+            'launch_off'      => ['nullable', 'integer', 'min:0', 'max:90'],
+            'launch_off_from' => ['nullable', 'string', 'max:30'],
+            'launch_off_to'   => ['nullable', 'string', 'max:30'],
         ], [], [
             'p1' => 'قیمت یک رشته', 'p2' => 'قیمت دو رشته', 'p3' => 'قیمت سه رشته',
+            'launch_off' => 'درصد تخفیف رونمایی',
         ]);
 
         $pricing->saveBundles([1 => $data['p1'], 2 => $data['p2'], 3 => $data['p3']]);
+
+        /* تخفیف رونمایی. تاریخ‌ها مثل exam_date شمسی نوشته و میلادی ذخیره
+           می‌شوند؛ اگر خام بمانند، مقایسه‌ی بازه سال ۱۴۰۶ میلادی می‌شود و
+           تخفیف هیچ‌وقت فعال نمی‌شود. «تا» به پایان همان روز کشیده می‌شود
+           وگرنه روز آخر از نیمه‌شب می‌پرد. */
+        $jal = function (?string $v, bool $endOfDay = false): ?string {
+            $v = trim((string) $v);
+            if ($v === '') return null;
+            $g = \App\Support\Jalali::parseToGregorian($v) ?: null;
+            if (!$g) return null;
+            return $endOfDay && !preg_match('~\d:\d~', $g)
+                ? substr($g, 0, 10) . ' 23:59:59' : $g;
+        };
+        $pricing->saveLaunchOffer(
+            (int) ($data['launch_off'] ?? 0),
+            $jal($data['launch_off_from'] ?? null),
+            $jal($data['launch_off_to'] ?? null, true),
+        );
 
         /* «1404:ce» → ['year' => 1404, 'exam' => 'ce'] */
         $books = [];
@@ -193,6 +219,9 @@ class ZabanAdminController extends Controller
                                                           $req->boolean('sec_list_meanings'));
         if (isset($data['new_per_day'])) {
             app(\App\Services\Security\Settings::class)->saveNewPerDay((int) $data['new_per_day']);
+        }
+        if (isset($data['rev_per_day'])) {
+            app(\App\Services\Security\Settings::class)->saveRevPerDay((int) $data['rev_per_day']);
         }
 
         if ($req->filled('exam_date')) {

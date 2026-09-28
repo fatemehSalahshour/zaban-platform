@@ -1612,9 +1612,22 @@ function applyRating(key,r){
     if(!res)return;
     c.s=res.s; c.d=res.d; c.iv=res.iv; c.serverDue=res.due;
     const sd=dayOfDate(res.due); if(sd!=null)c.due=sd;     /* حرف آخر با سرور */
+    c.unsynced=false;
     if(res.mastered)toast("این کارت مسلط شد.");
     if(typeof drawCard==="function"&&document.querySelector("#review.open"))updCardChip(key);
-  }).catch(()=>{});
+  }).catch(e=>{
+    /* قبلاً اینجا catch خالی بود و هر شکستی بی‌صدا می‌افتاد: کارت روی صفحه
+       حرکت می‌کرد ولی چیزی ذخیره نمی‌شد، و چون زمان‌بندی فقط از سرور خوانده
+       می‌شود، با اولین نوسازی همه‌ی کارت‌های امروز برمی‌گشتند — بدون اینکه
+       کاربر بفهمد چرا. حالا هم علامت می‌خورد، هم گفته می‌شود. */
+    c.unsynced=true;
+    if(!window.__revWarned){
+      window.__revWarned=true;
+      toast("مرور این کارت روی سرور ثبت نشد و با نوسازی صفحه برمی‌گردد. "
+           +"اگر تکرار شد، یک بار Ctrl+F5 بزنید.");
+    }
+    console.error("[review] ثبت نشد:",key,e);
+  });
 
   return c;
 }
@@ -1632,9 +1645,13 @@ const ivLabel=d=>d===0?"۱۰ دقیقه":d===1?"۱ روز":d<30?fa(d)+" روز":
    موعد کارت‌ها نگاه نمی‌کرد؛ عدد روی دکمه هم اندازه‌ی کل دک بود. حالا مثل
    انکی: اول سررسیدها (دیرکردترین اول)، بعد کارت تازه تا سقف روزانه، و کل
    صف تا سقف روز. دکمه‌ی بالا، کارت داشبورد و خود جلسه همه از همین. */
-/* سقف کارت تازه‌ی روز: انتخاب خود دانشجو در پروفایل، وگرنه پیش‌فرض مدیر (از /me)؛
-   ۲۰ فقط وقتی سرور چیزی نگفته باشد. var عمدی: بدون TDZ اگر زودتر صدا زده شود. */
-var DAY_CAP=60, NEW_PER_DAY=window.NEW_PER_DAY_CAP||20;
+/* سقف کارت تازه‌ی روز و سقف مرور روز: انتخاب خود دانشجو در پروفایل، وگرنه
+   پیش‌فرض مدیر (هر دو از /me). عددهای پایین فقط وقتی به کار می‌آیند که سرور
+   چیزی نگفته باشد. var عمدی: بدون TDZ اگر زودتر صدا زده شود.
+
+   DAY_CAP قبلاً ۶۰ ثابت بود و هیچ راهی برای عوض کردنش نبود؛ دانشجویی که
+   زبانش قوی‌تر است یا روزی وقت بیشتری دارد به همان دیوار می‌خورد. */
+var DAY_CAP=window.REV_PER_DAY_CAP||60, NEW_PER_DAY=window.NEW_PER_DAY_CAP||20;
 var newToday=window.NEW_TODAY||0;     /* از سرور؛ با هر کارت تازه‌ی مرورشده یکی بالا می‌رود */
 function todayQueue(kind){            /* kind: "w" | "q" | undefined = همه */
   const cards=allCards().filter(c=>!kind||c.t===kind);
@@ -1681,10 +1698,12 @@ function startReview(){
         +(newToday>=NEW_PER_DAY?` سقف ${fa(NEW_PER_DAY)} کارت تازه‌ی امروز هم پر شده است.`:""));
     }
     return}
-  /* سررسیدها اول، تازه‌ها بعد؛ ترتیب داخل هر گروه تصادفی. هر نوبت ۲۰ کارت. */
+  /* سررسیدها اول، تازه‌ها بعد؛ ترتیب داخل هر گروه تصادفی.
+     طول جلسه قبلاً ۲۰ ثابت بود و حتی اگر دانشجو سقف روزانه را بالا می‌برد،
+     هر نوبت باز هم ۲۰ کارت می‌آمد. حالا تا سقف روزانه‌ی خودش می‌رود. */
   const isNew=c=>{const s=sched[c.key];return !s||!(s.seen>0)};
   const shuf=a=>a.sort(()=>Math.random()-.5);
-  session=shuf(session.filter(c=>!isNew(c))).concat(shuf(session.filter(isNew))).slice(0,20);
+  session=shuf(session.filter(c=>!isNew(c))).concat(shuf(session.filter(isNew))).slice(0,DAY_CAP);
   pos=0;flipped=false;$("#review").classList.add("open");drawCard();syncUrl(true);
 }
 $("#startReview").addEventListener("click",startReview);
@@ -2453,6 +2472,7 @@ function renderProfile(){
   $("#pfGpa").value=P.gpa!=null?fa(String(P.gpa).replace(".","٫")):"";
   $("#pfQuota").value=P.quota; $("#pfDegree").value=P.degree;
   $("#pfNew").value=P.newPerDay?fa(String(P.newPerDay)):"";
+  $("#pfRev").value=P.revPerDay?fa(String(P.revPerDay)):"";
   $("#pfExam").value=P.examCode; $("#pfBoard").checked=P.board;
 
   const b=$("#pfSave");
@@ -2467,6 +2487,10 @@ function renderProfile(){
     const npRaw=$("#pfNew").value.trim().replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d));
     const np=npRaw===""?null:Number(npRaw);
     if(np!==null&&!(Number.isInteger(np)&&np>=5&&np<=100)){toast("کارت تازه در روز باید عددی بین ۵ تا ۱۰۰ باشد.");return}
+    /* مرور در روز: خالی یعنی پیش‌فرض مدیر */
+    const rpRaw=$("#pfRev").value.trim().replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d));
+    const rp=rpRaw===""?null:Number(rpRaw);
+    if(rp!==null&&!(Number.isInteger(rp)&&rp>=10&&rp<=500)){toast("مرور در روز باید عددی بین ۱۰ تا ۵۰۰ باشد.");return}
     const nick=$("#pfNick").value.trim();
     if(/[<>"&]/.test(nick)){toast("نام مستعار نمی‌تواند نویسه‌های < > \" & داشته باشد.");return}
     b.disabled=true;
@@ -2475,12 +2499,13 @@ function renderProfile(){
         nickname:nick||null, exam:$("#pfExam").value, show_in_board:$("#pfBoard").checked,
         university:$("#pfUni").value.trim()||null, gpa,
         quota:$("#pfQuota").value||null, degree:$("#pfDegree").value||null,
-        new_per_day:np,
+        new_per_day:np, rev_per_day:rp,
       });
       const merged=Object.assign({},LS.get("zban_prof")||{},p);
       LS.set("zban_prof",merged);
       Object.assign(PROF,profFromServer(merged));
       NEW_PER_DAY=PROF.newPerDay||NEW_PER_DAY;       /* صف «مرور امروز» با عدد تازه */
+      DAY_CAP=PROF.revPerDay||DAY_CAP;
       updDeckCount(); refreshAll(); renderProfile();
       toast("اطلاعات شما ثبت شد."+(p.show_in_board?" رتبه‌بندی هر ده دقیقه به‌روز می‌شود.":""));
     }catch(e){
@@ -5178,7 +5203,7 @@ function profFromServer(p){p=p||{};return {
   nick:p.nickname||"", exam:EXAM_CODE_FA[p.exam]||"مهندسی کامپیوتر", examCode:EXAM_CODE_FA[p.exam]?p.exam:"ce",
   board:p.show_in_board!==false, name:p.name||"", mobile:p.mobile||"",
   uni:p.university||"", gpa:p.gpa!=null?+p.gpa:null, quota:p.quota||"", degree:p.degree||"",
-  newPerDay:p.new_per_day||null}}
+  newPerDay:p.new_per_day||null, revPerDay:p.rev_per_day||null}}
 const PROF=profFromServer(LS.get("zban_prof"));
 const LB={days:1};
 const LB_QUICK=[[1,"امروز"],[7,"این هفته"],[30,"این ماه"]];

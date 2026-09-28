@@ -590,6 +590,8 @@ class ZabanController extends Controller
             'list_meanings' => $this->secSettings->listMeanings(),
             /* سقف کارت تازه در روز: انتخاب خود دانشجو، وگرنه پیش‌فرض مدیر */
             'new_per_day'   => (int) ($profile->new_per_day ?? 0) ?: $this->secSettings->newPerDay(),
+            /* سقف مرور روزانه: انتخاب خود دانشجو، وگرنه پیش‌فرض مدیر */
+            'rev_per_day'   => (int) ($profile->rev_per_day ?? 0) ?: $this->secSettings->revPerDay(),
             'profile' => [
                 'nickname' => $profile->nickname ?? null,
                 /* رشته‌ی پیش‌فرض: خریده‌شده؛ وگرنه رشته‌ی دمو (اول رشته‌ی پروفایل) */
@@ -683,6 +685,7 @@ class ZabanController extends Controller
             'quota'         => ['nullable', 'in:free,veteran'],
             'degree'        => ['nullable', 'in:msc,phd'],
             'new_per_day'   => ['nullable', 'integer', 'between:5,100'],
+            'rev_per_day'   => ['nullable', 'integer', 'between:10,500'],
         ], [
             'nickname.unique' => 'این نام مستعار را کاربر دیگری انتخاب کرده است.',
         ], [
@@ -698,6 +701,7 @@ class ZabanController extends Controller
             'quota'         => $d['quota'] ?? null,
             'degree'        => $d['degree'] ?? null,
             'new_per_day'   => $d['new_per_day'] ?? null,        /* NULL = پیش‌فرض مدیر */
+            'rev_per_day'   => $d['rev_per_day'] ?? null,        /* NULL = پیش‌فرض مدیر */
             'updated_at'    => now(),
         ];
         if (DB::table('zaban_profiles')->where('user_id', $uid)->exists()) {
@@ -713,6 +717,7 @@ class ZabanController extends Controller
             'university' => $p->university, 'gpa' => $p->gpa !== null ? (float) $p->gpa : null,
             'quota' => $p->quota, 'degree' => $p->degree,
             'new_per_day' => (int) ($p->new_per_day ?? 0) ?: $this->secSettings->newPerDay(),
+            'rev_per_day' => (int) ($p->rev_per_day ?? 0) ?: $this->secSettings->revPerDay(),
         ]]);
     }
 

@@ -20,6 +20,60 @@ class Pricing
     /** کلیدهای zaban_meta */
     private const K_BUNDLE  = 'price_bundle_';   // + تعداد رشته
     private const K_VERSION = 'price_version';
+    private const K_LAUNCH  = 'launch_off';      // درصد تخفیف رونمایی
+    private const K_LAUNCH_FROM = 'launch_off_from';
+    private const K_LAUNCH_TO   = 'launch_off_to';
+
+    /**
+     * تخفیف رونمایی — درصدی، مدت‌دار، روی مبلغ نهایی.
+     *
+     * روی «مبلغ قابل پرداخت» اعمال می‌شود نه روی قیمت تک‌رشته، یعنی روی
+     * تخفیف پلکانی سوار می‌شود نه جایگزینش. کسی که هر سه رشته را می‌خرد،
+     * هم تخفیف پلکانی می‌گیرد هم این را.
+     *
+     * بازه با تاریخ‌های میلادی در zaban_meta نگه داشته می‌شود. بیرون از
+     * بازه، انگار اصلاً نیست — نه در نمایش، نه در مبلغ سفارش.
+     *
+     * @return array{percent:int, from:?string, to:?string, active:bool, days_left:?int}
+     */
+    public function launchOffer(): array
+    {
+        return Cache::remember('zaban.launch_off', 60, function () {
+            $rows = DB::table('zaban_meta')
+                ->whereIn('k', [self::K_LAUNCH, self::K_LAUNCH_FROM, self::K_LAUNCH_TO])
+                ->pluck('v', 'k');
+
+            $pct  = (int) ($rows[self::K_LAUNCH] ?? 0);
+            $pct  = max(0, min(90, $pct));          /* سقف ۹۰٪ — جلوی صفر شدن سهوی مبلغ */
+            $from = trim((string) ($rows[self::K_LAUNCH_FROM] ?? '')) ?: null;
+            $to   = trim((string) ($rows[self::K_LAUNCH_TO] ?? '')) ?: null;
+
+            $now    = now();
+            $active = $pct > 0
+                && (!$from || $now->gte(\Illuminate\Support\Carbon::parse($from)))
+                && (!$to   || $now->lte(\Illuminate\Support\Carbon::parse($to)));
+
+            $left = null;
+            if ($active && $to) {
+                /* روزهای باقی‌مانده، رو به بالا — «۱ روز مانده» تا لحظه‌ی پایان */
+                $left = max(0, (int) ceil($now->floatDiffInDays(\Illuminate\Support\Carbon::parse($to), false)));
+            }
+
+            return ['percent' => $pct, 'from' => $from, 'to' => $to,
+                    'active' => $active, 'days_left' => $left];
+        });
+    }
+
+    public function saveLaunchOffer(int $percent, ?string $from, ?string $to): void
+    {
+        foreach ([self::K_LAUNCH => (string) max(0, min(90, $percent)),
+                  self::K_LAUNCH_FROM => (string) $from,
+                  self::K_LAUNCH_TO   => (string) $to] as $k => $v) {
+            DB::table('zaban_meta')->updateOrInsert(['k' => $k],
+                ['v' => $v, 'updated_at' => now()]);
+        }
+        Cache::forget('zaban.launch_off');
+    }
 
     /** اگر هیچ‌وقت در پنل ذخیره نشده باشد (تومان) */
     private const DEFAULTS = [1 => 1_000_000, 2 => 1_200_000, 3 => 1_400_000];
@@ -104,7 +158,13 @@ class Pricing
         }
 
         $list    = $n * $unit;
-        $payable = $bundle[$n] ?? $list;
+        $bundled = $bundle[$n] ?? $list;
+
+        /* تخفیف رونمایی روی مبلغ بعد از تخفیف پلکانی می‌نشیند.
+           رند به ۱۰۰۰ تومان پایین، تا مبلغ درگاه عدد گنگ نشود. */
+        $off     = $this->launchOffer();
+        $launch  = $off['active'] ? (int) (floor($bundled * $off['percent'] / 100 / 1000) * 1000) : 0;
+        $payable = max(0, $bundled - $launch);
 
         return [
             'exams'         => $exams,
@@ -114,7 +174,13 @@ class Pricing
                 'exam' => $e, 'name' => self::NAMES[$e], 'price' => $unit,
             ], $billable),
             'list_price'    => $list,
+            /* «تخفیف» جمع هر دو است — همان عددی که کاربر صرفه‌جویی می‌کند */
             'discount'      => $list - $payable,
+            'bundle_price'  => $bundled,
+            'launch_off'    => $launch,
+            'launch_pct'    => $off['active'] ? $off['percent'] : 0,
+            'launch_until'  => $off['active'] ? $off['to'] : null,
+            'launch_days'   => $off['active'] ? $off['days_left'] : null,
             'payable'       => $payable,
             'price_version' => $this->version(),
         ];

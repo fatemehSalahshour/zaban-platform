@@ -36,6 +36,56 @@
   </div>
 
   <div class="panel">
+    <h3>تخفیف رونمایی</h3>
+    <p>یک تخفیف درصدی مدت‌دار که <b>روی مبلغ نهایی</b> می‌نشیند — یعنی روی تخفیف
+       پلکانی سوار می‌شود، نه جایگزین آن. بیرون از بازه خودش خاموش می‌شود و
+       لازم نیست چیزی را دستی برگردانید.</p>
+
+    @php
+      $jToday = \App\Support\Jalali::formatFromGregorian(now()->format('Y-m-d'));
+      $jTwoWk = \App\Support\Jalali::formatFromGregorian(now()->addDays(14)->format('Y-m-d'));
+    @endphp
+
+    @if ($launch['active'])
+      <div class="ok" style="margin-bottom:14px">
+        هم‌اکنون فعال است: <b>{{ $launch['percent'] }}٪</b>
+        @if ($launch['days_left'] !== null) — {{ $launch['days_left'] }} روز مانده @endif
+      </div>
+    @elseif ($launch['percent'] > 0)
+      <div class="dev" style="margin-bottom:14px">درصد تنظیم شده ولی بیرون از بازه است، پس روی هیچ سفارشی اثر ندارد.</div>
+    @endif
+
+    <div class="field">
+      <label for="launch_off">درصد تخفیف
+        <i>۰ یعنی خاموش. سقف ۹۰٪ است تا مبلغ سهواً صفر نشود.</i>
+      </label>
+      <div class="tier">
+        <input type="number" id="launch_off" name="launch_off" min="0" max="90" step="1"
+               value="{{ old('launch_off', $launch['percent']) }}">
+        <span class="unit">٪</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="launch_off_from">از تاریخ
+        <i>شمسی — خالی یعنی از همین حالا. امروز: {{ $jToday }}</i>
+      </label>
+      <input type="text" id="launch_off_from" name="launch_off_from" dir="ltr"
+             placeholder="{{ str_replace('-', '/', $jToday) }}"
+             value="{{ old('launch_off_from', $launch['from'] ? str_replace('-', '/', \App\Support\Jalali::formatFromGregorian(substr($launch['from'], 0, 10))) : '') }}">
+    </div>
+
+    <div class="field">
+      <label for="launch_off_to">تا تاریخ
+        <i>شمسی — تا پایان همان روز. برای دو هفته: {{ $jTwoWk }}</i>
+      </label>
+      <input type="text" id="launch_off_to" name="launch_off_to" dir="ltr"
+             placeholder="{{ str_replace('-', '/', $jTwoWk) }}"
+             value="{{ old('launch_off_to', $launch['to'] ? str_replace('-', '/', \App\Support\Jalali::formatFromGregorian(substr($launch['to'], 0, 10))) : '') }}">
+    </div>
+  </div>
+
+  <div class="panel">
     <h3>تاریخ کنکور</h3>
     <p>دسترسی خریداری‌شده تا این تاریخ معتبر است و شمارش معکوس داشبورد
        دانشجو هم از همین می‌آید.</p>
@@ -92,12 +142,18 @@
 
   <div class="panel">
     <h3>مرور</h3>
-    <p>سقف کارت تازه‌ای که هر روز وارد «مرور امروز» می‌شود. این پیش‌فرض همه است؛
-       هر دانشجو می‌تواند در پروفایل خودش عدد دیگری (۵ تا ۱۰۰) بگذارد.</p>
+    <p>دو سقف جدا: کارت‌های <b>تازه</b>ای که هر روز وارد «مرور امروز» می‌شوند، و کل
+       کارت‌های <b>سررسیدشده</b>ای که در یک روز پرسیده می‌شوند. این‌ها پیش‌فرض همه‌اند؛
+       هر دانشجو می‌تواند در پروفایل خودش عدد دیگری بگذارد — مثل انکی.</p>
     <div class="field">
       <label for="new_per_day">کارت تازه در روز <i>پیش‌فرض ۲۰ · بین ۵ تا ۱۰۰</i></label>
       <input type="number" id="new_per_day" name="new_per_day" dir="ltr" min="5" max="100"
              value="{{ old('new_per_day', $newPerDay) }}" style="max-width:140px">
+    </div>
+    <div class="field">
+      <label for="rev_per_day">مرور در روز <i>پیش‌فرض ۶۰ · بین ۱۰ تا ۵۰۰ · طول هر نوبت مرور هم همین است</i></label>
+      <input type="number" id="rev_per_day" name="rev_per_day" dir="ltr" min="10" max="500"
+             value="{{ old('rev_per_day', $revPerDay) }}" style="max-width:140px">
     </div>
   </div>
 

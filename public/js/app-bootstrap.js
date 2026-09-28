@@ -345,6 +345,7 @@ window.ZABAN = (function () {
     window.PLATFORMS     = me.platforms || null;
     window.LIST_MEANINGS = me.list_meanings !== false;   /* فهرست‌ها با معنی؟ (پنل مدیریت) */
     window.NEW_PER_DAY_CAP = me.new_per_day || null;     /* سقف کارت تازه: پروفایل یا پیش‌فرض مدیر */
+    window.REV_PER_DAY_CAP = me.rev_per_day || null;     /* سقف مرور روزانه: همان منطق */
     if (me.ok && /^[0-9a-f]{32}$/.test(me.ok)) OBF_KEY = me.ok;       /* {current, list:[{key,n,d,i,url}]} */
     /* نسخه‌ی نمایشی: اگر محتوای بارگذاری‌شده فقط یک سال است، سرور demo_year را می‌گوید */
     window.DEMO_YEAR    = content.demo_year || null;

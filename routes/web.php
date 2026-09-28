@@ -16,9 +16,15 @@ use App\Http\Controllers\ZabanAdminAlertController;
 Route::get('/', function (\App\Services\Pricing $pricing, \App\Services\LandingFacts $facts) {
     if (auth()->check()) return redirect()->route('zaban');
 
+    /* قیمت هر سه رشته، با تخفیف رونمایی اگر فعال باشد — وگرنه عددِ لندینگ
+       با مبلغ صفحه‌ی خرید نمی‌خواند و کاربر حس می‌کند قیمت عوض شده. */
+    $q = $pricing->quote(\App\Services\Entitlements::EXAMS);
+
     return view('landing', [
         /* عدد فارسی با جداکننده‌ی فارسی — بقیه‌ی صفحه هم با رقم فارسی است */
-        'price'    => \App\Support\FaNum::format($pricing->bundles()[3] ?? 0),   /* هر سه رشته */
+        'price'    => \App\Support\FaNum::format($q['payable']),
+        'wasPrice' => $q['launch_off'] > 0 ? \App\Support\FaNum::format($q['bundle_price']) : null,
+        'launchPct'=> $q['launch_pct'] ?? 0,
         'examDate' => $pricing->accessUntil(),         /* میلادی؛ شمارش معکوس صفحه */
         /* اعداد و کلمه‌های نمونه از خود بانک — قبلاً در HTML و landing.js ثابت بودند */
         'facts'    => $facts->facts(),

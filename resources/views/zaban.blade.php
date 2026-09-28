@@ -371,6 +371,9 @@
     <div class="f"><label>کارت تازه در روز
         <span class="capt" style="display:block;margin:0">بین ۵ تا ۱۰۰ · خالی = پیش‌فرض پلتفرم</span></label>
       <input class="inp en" id="pfNew" inputmode="numeric" placeholder="۲۰"></div>
+    <div class="f"><label>مرور در روز
+        <span class="capt" style="display:block;margin:0">بین ۱۰ تا ۵۰۰ · خالی = پیش‌فرض پلتفرم · سقف کارت‌های سررسیدشده، جدا از کارت تازه</span></label>
+      <input class="inp en" id="pfRev" inputmode="numeric" placeholder="۶۰"></div>
     <div class="f"><label>سهمیه</label><select class="inp" id="pfQuota">
       <option value="">انتخاب نشده</option><option value="free">آزاد</option><option value="veteran">ایثارگر</option></select></div>
     <div class="f"><label>متقاضی چه کنکوری هستید؟</label><select class="inp" id="pfDegree">

@@ -46,6 +46,29 @@ class Settings
         Cache::forget('zaban.sec.new_per_day');
     }
 
+    /**
+     * سقف پیش‌فرض مرور در روز — یعنی کل کارت‌های سررسیدشده‌ای که در یک روز
+     * پرسیده می‌شوند (جدا از کارت تازه، که سقف خودش را دارد).
+     *
+     * تا پیش از این عدد ۶۰ در app.js ثابت بود و کسی نمی‌توانست عوضش کند؛
+     * دانشجویی که زبانش قوی‌تر است یا روزی وقت بیشتری دارد، به دیوار می‌خورد.
+     * مثل انکی: پیش‌فرض را مدیر می‌گذارد، دانشجو در پروفایل بالا/پایین می‌برد.
+     */
+    public function revPerDay(): int
+    {
+        $v = Cache::remember('zaban.sec.rev_per_day', 60, fn () =>
+            DB::table('zaban_meta')->where('k', 'rev_per_day')->value('v'));
+        $n = is_numeric($v) ? (int) $v : (int) config('zaban.rev_per_day', 60);
+        return max(10, min(500, $n));
+    }
+
+    public function saveRevPerDay(int $n): void
+    {
+        DB::table('zaban_meta')->updateOrInsert(['k' => 'rev_per_day'],
+            ['v' => (string) max(10, min(500, $n)), 'updated_at' => now()]);
+        Cache::forget('zaban.sec.rev_per_day');
+    }
+
     /** فهرست بدون معنی؟ (پیش‌فرض: با معنی) */
     public function listMeanings(): bool
     {
