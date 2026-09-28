@@ -7,6 +7,9 @@
      همان کلید و همان فرمتی که app-bootstrap.js با LS.set('zban_theme', …) می‌سازد. --}}
 <script>try{var t=JSON.parse(localStorage.getItem('zaban:zban_theme'));if(t&&t!=='light')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <title>@yield('title', 'خرید پکیج') — پلتفرم زبان کنکور ارشد</title>
+<link rel="icon" href="/favicon/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">

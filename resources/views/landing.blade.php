@@ -3,7 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>پلتفرم زبان کنکور ارشد کامپیوتر — ۲۵ سال کنکور زبان، در یک دک مرور</title>
+<title>پلتفرم زبان کنکور ارشد کامپیوتر، آی‌تی و علوم کامپیوتر</title>
+<link rel="icon" href="/favicon/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-icon-180x180.png">
+<link rel="manifest" href="/favicon/manifest.json">
+<meta name="theme-color" content="#16191d">
 <meta name="description" content="همه‌ی کلمات و تست‌های زبان کنکور ارشد مهندسی کامپیوتر، آی‌تی و علوم کامپیوتر از ۱۳۸۱ تا ۱۴۰۵؛ سطح‌بندی‌شده، با پیش‌بینی آماری و مرور فاصله‌دار تا روز کنکور.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

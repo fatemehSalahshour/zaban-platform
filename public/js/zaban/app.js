@@ -1184,12 +1184,13 @@ function renderText(y,e,sec,p){
      <div class="capt">کلمات هایلایت‌شده در بانک ثبت شده‌اند؛ روی هرکدام بزنید تا معنی و تاریخچه‌اش باز شود.</div></section>
    ${g?`<section><div class="label">سؤال‌های این ${sec==="پسیج"?"پسیج":"کلوز"}</div>
      <div class="kin">${Array.from({length:g[4]-g[3]+1},(_,i)=>g[3]+i).map(q=>`<span data-goq="${y}|${e}|${q}" style="cursor:pointer">تست ${fa(q)}</span>`).join("")}</div></section>`:""}
-   <section><div class="label">کلمات این متن <span class="cnt">${fa(ws.length)}</span></div>
+   <details class="twfold" ${ws.length<=12?"open":""}>
+     <summary><span class="label" style="margin:0">کلمات این متن <span class="cnt">${fa(ws.length)}</span></span><i class="ch">▾</i></summary>
      <div class="twords">${ws.slice().sort((a,b)=>a.w.localeCompare(b.w)).map(w=>{
         const m=MEANS[WID[w.w]]||"";
         return `<button class="tw" data-w="${w.w}">
           <bdi class="en">${w.w}</bdi><span class="fa">${m||"…"}</span></button>`;
-      }).join("")}</div></section>`;
+      }).join("")}</div></details>`;
   $("#detail").classList.remove("open");$("#qview").classList.add("open");
 }
 
