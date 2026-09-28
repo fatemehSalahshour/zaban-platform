@@ -64,19 +64,28 @@
     var show = $('rShow');
     var rate = $('rRate');
 
-    /* دکمه‌ی دیگری (مثلاً بستن یا گزارش) فوکوس دارد: Enter/Space کار خودش را بکند.
-       دکمه‌های خودِ مرور مستثنی‌اند تا کلیک دوباره نخورد. */
+    /* فوکوس صفحه هنوز روی دکمه‌ای بیرون از پنجره‌ی مرور مانده (مثلاً همان دکمه‌ای که
+       مرور را باز کرد). Space/Enter آن دکمه را دوباره «کلیک» می‌کرد و مرور از نو
+       شروع می‌شد — یعنی اولین Space به کارت بعدی می‌رفت. پس فوکوس را رها می‌کنیم
+       و خودمان کار را انجام می‌دهیم. */
     var t = e.target;
+    var sheet = $('review');
+    var inside = sheet && t && sheet.contains(t);
+    if (t && t !== document.body && !inside && t.blur) t.blur();
+
+    /* دکمه‌ی داخل پنجره که با «تب» فوکوس گرفته (بستن، گزارش، …): Enter/Space کار
+       خودش را بکند. دکمه‌ای که با ماوس فوکوس گرفته، یا دکمه‌های خودِ مرور، مستثنی‌اند. */
     var own = t === show || (rate && rate.contains(t));
-    if (t && (t.tagName === 'BUTTON' || t.tagName === 'A') && !own) return;
+    if (inside && !own && t.matches && (t.tagName === 'BUTTON' || t.tagName === 'A') &&
+        t.matches(':focus-visible')) return;
 
     /* نمایش پاسخ */
     if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter') {
       if (visible(show)) {
         e.preventDefault();
         show.click();
-      } else if (own) {
-        /* فوکوس روی دکمه‌ای است که الان فعال نیست؛ کلیک بومی نزند */
+      } else {
+        /* پاسخ از قبل نمایش داده شده؛ Enter/Space نباید دکمه‌ی فوکوس‌شده را کلیک کند */
         e.preventDefault();
       }
       return;
@@ -91,5 +100,17 @@
         btn.click();
       }
     }
+  });
+
+  /* کلیک بومی دکمه با Space روی keyup رخ می‌دهد؛ برای دکمه‌هایی که keydown‌شان را
+     خودمان گرفته‌ایم، keyup هم کلیکی نسازد. */
+  document.addEventListener('keyup', function (e) {
+    if (e.code !== 'Space' && e.code !== 'Enter' && e.code !== 'NumpadEnter') return;
+    var t = e.target;
+    if (!t || t === document.body || typing(t) || !reviewActive()) return;
+    var sheet = $('review');
+    var keyboardBtn = sheet && sheet.contains(t) && t.matches && t.matches(':focus-visible') &&
+                      t !== $('rShow') && !($('rRate') && $('rRate').contains(t));
+    if (!keyboardBtn) e.preventDefault();
   });
 })();
