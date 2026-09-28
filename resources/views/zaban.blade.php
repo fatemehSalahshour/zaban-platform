@@ -375,7 +375,9 @@
 <div id="tab-profile" hidden>
   <div class="sechead"><h2>پروفایل<span class="sub">اطلاعات شما برای صدور کارنامه و پشتیبانی استفاده می‌شود</span></h2></div>
   <div class="panel"><div class="fg">
-    <div class="f"><label>نام و نام خانوادگی</label><input class="inp" id="pfName" disabled></div>
+    <div class="f"><label>نام و نام خانوادگی
+        <span class="capt" style="display:block;margin:0">در کارنامه و پشتیبانی دیده می‌شود</span></label>
+      <input class="inp" id="pfName" maxlength="60"></div>
     <div class="f" id="pfMobileF" hidden><label>شماره موبایل</label><input class="inp en" id="pfMobile" disabled></div>
     <div class="f"><label>نام مستعار در رتبه‌بندی</label><input class="inp" id="pfNick" maxlength="30" placeholder="اگر خالی بماند، «بی‌نام» دیده می‌شوید"></div>
     <div class="f"><label>دانشگاه</label><input class="inp" id="pfUni" maxlength="150"></div>

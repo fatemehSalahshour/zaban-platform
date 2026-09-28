@@ -2563,7 +2563,7 @@ function renderAnnounce(){
    تا نسخه‌ی دمو همه‌ی مقدارها در HTML ثابت بود و «ثبت» فقط در مرورگر می‌نوشت. */
 function renderProfile(){
   const P=PROF;
-  $("#pfName").value=P.name||"—";
+  $("#pfName").value=P.name||"";
   $("#pfMobileF").hidden=!P.mobile; $("#pfMobile").value=P.mobile||"";
   $("#pfNick").value=P.nick; $("#pfUni").value=P.uni;
   $("#pfGpa").value=P.gpa!=null?fa(String(P.gpa).replace(".","٫")):"";
@@ -2590,9 +2590,15 @@ function renderProfile(){
     if(rp!==null&&!(Number.isInteger(rp)&&rp>=10&&rp<=500)){toast("مرور در روز باید عددی بین ۱۰ تا ۵۰۰ باشد.");return}
     const nick=$("#pfNick").value.trim();
     if(/[<>"&]/.test(nick)){toast("نام مستعار نمی‌تواند نویسه‌های < > \" & داشته باشد.");return}
+    /* نام نمایشی: حساب‌هایی که سرور احراز هویت نامی برایشان نفرستاده، با
+       شماره‌ی موبایل ساخته می‌شوند و کاربر باید بتواند اصلاحش کند. */
+    const nm=$("#pfName").value.trim();
+    if(/[<>"&]/.test(nm)){toast("نام نمی‌تواند نویسه‌های < > \" & داشته باشد.");return}
+    if(nm!==""&&nm.length<2){toast("نام باید دست‌کم دو نویسه باشد.");return}
     b.disabled=true;
     try{
       const p=await ZABAN.profile({
+        name:nm||null,
         nickname:nick||null, exam:$("#pfExam").value, show_in_board:$("#pfBoard").checked,
         university:$("#pfUni").value.trim()||null, gpa,
         quota:$("#pfQuota").value||null, degree:$("#pfDegree").value||null,

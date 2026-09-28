@@ -669,7 +669,15 @@ class ZabanController extends Controller
         ]);
     }
 
-    /** PUT /api/profile — پروفایل کاربر. نام و موبایل از حساب کاربر است و اینجا عوض نمی‌شود. */
+    /**
+     * PUT /api/profile — پروفایل کاربر.
+     *
+     * موبایل از حساب کاربر است و اینجا عوض نمی‌شود (منبعش سرور احراز هویت است).
+     * نام اما قابل ویرایش شد: اگر سرور احراز هویت نامی نفرستد، حساب با شماره‌ی
+     * موبایل به‌عنوان نام ساخته می‌شود و کاربر هیچ راهی برای اصلاحش نداشت —
+     * همان نامی که در کارنامه و پشتیبانی دیده می‌شود. ورود دوباره‌ی SSO نام را
+     * بازنویسی نمی‌کند، پس این ویرایش پایدار است.
+     */
     public function profile(Request $req): JsonResponse
     {
         $uid = $req->user()->id;
@@ -685,11 +693,20 @@ class ZabanController extends Controller
             'degree'        => ['nullable', 'in:msc,phd'],
             'new_per_day'   => ['nullable', 'integer', 'between:5,100'],
             'rev_per_day'   => ['nullable', 'integer', 'between:10,500'],
+            /* نام نمایشی — در کارنامه و پشتیبانی دیده می‌شود */
+            'name'          => ['nullable', 'string', 'min:2', 'max:60', 'regex:/^[^<>"&]*$/u'],
         ], [
             'nickname.unique' => 'این نام مستعار را کاربر دیگری انتخاب کرده است.',
         ], [
             'nickname' => 'نام مستعار', 'gpa' => 'معدل', 'university' => 'دانشگاه',
+            'name' => 'نام و نام خانوادگی',
         ]);
+
+        /* نام روی خودِ حساب می‌نشیند، نه روی zaban_profiles: همه‌جای پلتفرم
+           (کارنامه، رتبه‌بندی، پنل) از همان می‌خواند. خالی یعنی دست نزن. */
+        if (isset($d['name']) && trim($d['name']) !== '') {
+            DB::table('users')->where('id', $uid)->update(['name' => trim($d['name'])]);
+        }
 
         $row = [
             'nickname'      => isset($d['nickname']) && trim($d['nickname']) !== '' ? trim($d['nickname']) : null,
@@ -711,6 +728,7 @@ class ZabanController extends Controller
 
         $p = DB::table('zaban_profiles')->where('user_id', $uid)->first();
         return response()->json(['profile' => [
+            'name' => DB::table('users')->where('id', $uid)->value('name'),
             'nickname' => $p->nickname, 'exam' => $this->ent->defaultExam($uid, $p->exam),
             'show_in_board' => (bool) $p->show_in_board,
             'university' => $p->university, 'gpa' => $p->gpa !== null ? (float) $p->gpa : null,
