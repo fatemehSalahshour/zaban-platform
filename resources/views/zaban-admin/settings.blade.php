@@ -72,7 +72,7 @@
       </label>
       <input type="text" id="launch_off_title" name="launch_off_title" maxlength="40"
              placeholder="{{ \App\Services\Pricing::LAUNCH_TITLE_DEFAULT }}"
-             value="{{ old('launch_off_title', ($launch['title'] ?? '') === \App\Services\Pricing::LAUNCH_TITLE_DEFAULT ? '' : ($launch['title'] ?? '')) }}">
+             value="{{ old('launch_off_title', $launch['title_raw'] ?? '') }}">
     </div>
 
     <div class="field">

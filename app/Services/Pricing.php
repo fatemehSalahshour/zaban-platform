@@ -71,12 +71,16 @@ class Pricing
 
             /* متن از پنل می‌آید تا برای هر مناسبتی («تخفیف نوروزی»، «تخفیف
                پایان ترم») لازم نباشد کد عوض شود. */
-            $title = trim((string) ($rows[self::K_LAUNCH_TITLE] ?? '')) ?: self::LAUNCH_TITLE_DEFAULT;
+            $rawTitle = trim((string) ($rows[self::K_LAUNCH_TITLE] ?? ''));
+            $title = $rawTitle ?: self::LAUNCH_TITLE_DEFAULT;
             $note  = trim((string) ($rows[self::K_LAUNCH_NOTE] ?? '')) ?: null;
 
             return ['percent' => $pct, 'from' => $from, 'to' => $to,
                     'active' => $active, 'days_left' => $left,
-                    'title' => $title, 'note' => $note];
+                    /* title همان چیزی است که روی صفحه‌ها نوشته می‌شود؛ title_raw
+                       دقیقاً چیزی است که مدیر ذخیره کرده (شاید خالی) — فرم پنل
+                       باید همان را نشان دهد، نه مقدار جایگزین‌شده. */
+                    'title' => $title, 'title_raw' => $rawTitle, 'note' => $note];
         });
     }
 
