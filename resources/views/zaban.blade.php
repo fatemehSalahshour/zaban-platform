@@ -19,6 +19,14 @@
 <link rel="stylesheet" href="/css/zaban.css?v={{ filemtime(public_path('css/zaban.css')) }}">
 </head>
 <body>
+@php
+  /* نوار قرمز خطاهای جاوااسکریپت — ابزار توسعه است، نه چیزی که کاربر باید
+     ببیند: متن خطا و چند خط اول stack را روی صفحه چاپ می‌کند. فقط برای
+     کارکنان پلتفرم و روی لوکال. برای بقیه، خطا مثل همیشه در کنسول می‌ماند. */
+  $showErrBar = app()->environment('local')
+      || in_array(auth()->user()->type ?? '', ['admin', 'manager', 'editor'], true);
+@endphp
+@if ($showErrBar)
 <div id="errbar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#7d1d1d;color:#fff;
   font-family:Vazirmatn,monospace;font-size:12.5px;padding:10px 14px;line-height:1.9;direction:ltr;text-align:left;max-height:40vh;overflow:auto"></div>
 <script>
@@ -56,6 +64,7 @@
   window.__err=show;
 })();
 </script>
+@endif
 <div class="wrap">
 
 <div id="demoBar" class="demobar" hidden></div>

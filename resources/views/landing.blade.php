@@ -11,6 +11,22 @@
 <link rel="manifest" href="/favicon/manifest.json">
 <meta name="theme-color" content="#16191d">
 <meta name="description" content="همه‌ی کلمات و تست‌های زبان کنکور ارشد مهندسی کامپیوتر، آی‌تی و علوم کامپیوتر از ۱۳۸۱ تا ۱۴۰۵؛ سطح‌بندی‌شده، با پیش‌بینی آماری و مرور فاصله‌دار تا روز کنکور.">
+{{-- کارت اشتراک‌گذاری: بدون این، لینک در تلگرام و واتساپ بدون عنوان و تصویر
+     فرستاده می‌شود و شبیه یک آدرس خام دیده می‌شود. --}}
+<link rel="canonical" href="{{ url('/') }}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="پلتفرم زبان کنکور ارشد">
+<meta property="og:locale" content="fa_IR">
+<meta property="og:url" content="{{ url('/') }}">
+<meta property="og:title" content="پلتفرم زبان کنکور ارشد کامپیوتر، آی‌تی و علوم کامپیوتر">
+<meta property="og:description" content="همه‌ی کلمات و تست‌های زبان کنکور ارشد از ۱۳۸۱ تا ۱۴۰۵، سطح‌بندی‌شده، با پیش‌بینی آماری و مرور فاصله‌دار تا روز کنکور.">
+<meta property="og:image" content="{{ url('/favicon/android-icon-512x512.png') }}">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="پلتفرم زبان کنکور ارشد کامپیوتر، آی‌تی و علوم کامپیوتر">
+<meta name="twitter:description" content="همه‌ی کلمات و تست‌های زبان کنکور ارشد از ۱۳۸۱ تا ۱۴۰۵، با مرور فاصله‌دار تا روز کنکور.">
+<meta name="twitter:image" content="{{ url('/favicon/android-icon-512x512.png') }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&family=Markazi+Text:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;1,400;1,500;1,600&display=swap" rel="stylesheet">
