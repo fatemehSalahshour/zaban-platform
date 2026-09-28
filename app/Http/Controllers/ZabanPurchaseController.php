@@ -42,7 +42,13 @@ class ZabanPurchaseController extends Controller
     public function page(Request $req)
     {
         $owned = $this->ent->for($req->user()->id);
-        $pre   = array_filter(explode(',', (string) $req->query('exam', '')));
+
+        /* پیش‌فرض: هر رشته‌ای که هنوز ندارد تیک خورده باشد.
+           قبلاً صفحه با انتخاب خالی باز می‌شد و جمع صفر بود، پس کاربری که از
+           لندینگ می‌آمد اول باید خودش دنبال تیک می‌گشت. ?exam=it اگر بیاید،
+           همان می‌ماند — لینک‌های هدفمند باید بتوانند انتخاب را باریک کنند. */
+        $pre = array_filter(explode(',', (string) $req->query('exam', '')))
+            ?: array_keys(Pricing::NAMES);
 
         $uid = $req->user()->id;
 

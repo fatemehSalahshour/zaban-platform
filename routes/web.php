@@ -26,6 +26,8 @@ Route::get('/', function (\App\Services\Pricing $pricing, \App\Services\LandingF
         'price'    => \App\Support\FaNum::format($q['payable']),
         'wasPrice' => $q['launch_off'] > 0 ? \App\Support\FaNum::format($q['bundle_price']) : null,
         'launchPct'=> $q['launch_pct'] ?? 0,
+        /* متن تخفیف از پنل مدیریت می‌آید، نه از کد */
+        'launchTitle' => $q['launch_title'] ?? \App\Services\Pricing::LAUNCH_TITLE_DEFAULT,
         'examDate' => $pricing->accessUntil(),         /* میلادی؛ شمارش معکوس صفحه */
         /* اعداد و کلمه‌های نمونه از خود بانک — قبلاً در HTML و landing.js ثابت بودند */
         'facts'    => $facts->facts(),

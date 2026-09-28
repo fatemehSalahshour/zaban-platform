@@ -13,6 +13,7 @@
        border:1px solid var(--gold-line);border-radius:12px;padding:11px 15px;margin-bottom:16px}
   .launch b{font-size:15px;color:#8a5206}
   .launch span{font-size:13px;color:#8a5206;opacity:.85;margin-right:auto}
+  .launch span.note{margin-right:0;opacity:1}
   .buylead{color:var(--ink-2);margin-bottom:22px}
 
   .buygrid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;align-items:start}
@@ -71,7 +72,8 @@
 
   @if (!empty($launch['active']))
     <div class="launch">
-      <b>{{ \App\Support\FaNum::format($launch['percent']) }}٪ تخفیف رونمایی</b>
+      <b>{{ \App\Support\FaNum::format($launch['percent']) }}٪ {{ $launch['title'] ?? \App\Services\Pricing::LAUNCH_TITLE_DEFAULT }}</b>
+      @if (!empty($launch['note']))<span class="note">{{ $launch['note'] }}</span>@endif
       @if ($launch['days_left'] !== null)
         <span>{{ $launch['days_left'] > 0
           ? \App\Support\FaNum::format($launch['days_left']) . ' روز تا پایان'
@@ -196,7 +198,7 @@
       lines.innerHTML=(q.lines||[]).map(l=>`<div class="line"><span>${l.name}</span><b>${money(l.price)}</b></div>`).join('')
         +(q.launch_off>0
             ? `<div class="line off"><span>تخفیف پلکانی</span><b>− ${money(q.list_price-q.bundle_price)}</b></div>`
-              +`<div class="line off"><span>تخفیف رونمایی (${Number(q.launch_pct).toLocaleString('fa-IR')}٪)</span><b>− ${money(q.launch_off)}</b></div>`
+              +`<div class="line off"><span>${q.launch_title||'تخفیف'} (${Number(q.launch_pct).toLocaleString('fa-IR')}٪)</span><b>− ${money(q.launch_off)}</b></div>`
             : (q.discount>0?`<div class="line off"><span>تخفیف پلکانی</span><b>− ${money(q.discount)}</b></div>`
                            :`<div class="line off"><span>تخفیف پلکانی</span><b>− ۰</b></div>`));
 

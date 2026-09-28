@@ -23,6 +23,11 @@ class Pricing
     private const K_LAUNCH  = 'launch_off';      // درصد تخفیف رونمایی
     private const K_LAUNCH_FROM = 'launch_off_from';
     private const K_LAUNCH_TO   = 'launch_off_to';
+    private const K_LAUNCH_TITLE = 'launch_off_title';   /* نام تخفیف روی صفحه‌ها */
+    private const K_LAUNCH_NOTE  = 'launch_off_note';    /* یک خط توضیح، اختیاری */
+
+    /** اگر مدیر چیزی ننوشته باشد */
+    public const LAUNCH_TITLE_DEFAULT = 'تخفیف رونمایی';
 
     /**
      * تخفیف رونمایی — درصدی، مدت‌دار، روی مبلغ نهایی.
@@ -40,7 +45,8 @@ class Pricing
     {
         return Cache::remember('zaban.launch_off', 60, function () {
             $rows = DB::table('zaban_meta')
-                ->whereIn('k', [self::K_LAUNCH, self::K_LAUNCH_FROM, self::K_LAUNCH_TO])
+                ->whereIn('k', [self::K_LAUNCH, self::K_LAUNCH_FROM, self::K_LAUNCH_TO,
+                                self::K_LAUNCH_TITLE, self::K_LAUNCH_NOTE])
                 ->pluck('v', 'k');
 
             $pct  = (int) ($rows[self::K_LAUNCH] ?? 0);
@@ -59,16 +65,25 @@ class Pricing
                 $left = max(0, (int) ceil($now->floatDiffInDays(\Illuminate\Support\Carbon::parse($to), false)));
             }
 
+            /* متن از پنل می‌آید تا برای هر مناسبتی («تخفیف نوروزی»، «تخفیف
+               پایان ترم») لازم نباشد کد عوض شود. */
+            $title = trim((string) ($rows[self::K_LAUNCH_TITLE] ?? '')) ?: self::LAUNCH_TITLE_DEFAULT;
+            $note  = trim((string) ($rows[self::K_LAUNCH_NOTE] ?? '')) ?: null;
+
             return ['percent' => $pct, 'from' => $from, 'to' => $to,
-                    'active' => $active, 'days_left' => $left];
+                    'active' => $active, 'days_left' => $left,
+                    'title' => $title, 'note' => $note];
         });
     }
 
-    public function saveLaunchOffer(int $percent, ?string $from, ?string $to): void
+    public function saveLaunchOffer(int $percent, ?string $from, ?string $to,
+                                    ?string $title = null, ?string $note = null): void
     {
         foreach ([self::K_LAUNCH => (string) max(0, min(90, $percent)),
                   self::K_LAUNCH_FROM => (string) $from,
-                  self::K_LAUNCH_TO   => (string) $to] as $k => $v) {
+                  self::K_LAUNCH_TO   => (string) $to,
+                  self::K_LAUNCH_TITLE => trim((string) $title),
+                  self::K_LAUNCH_NOTE  => trim((string) $note)] as $k => $v) {
             DB::table('zaban_meta')->updateOrInsert(['k' => $k],
                 ['v' => $v, 'updated_at' => now()]);
         }
@@ -179,6 +194,7 @@ class Pricing
             'bundle_price'  => $bundled,
             'launch_off'    => $launch,
             'launch_pct'    => $off['active'] ? $off['percent'] : 0,
+            'launch_title'  => $off['active'] ? $off['title'] : null,
             'launch_until'  => $off['active'] ? $off['to'] : null,
             'launch_days'   => $off['active'] ? $off['days_left'] : null,
             'payable'       => $payable,

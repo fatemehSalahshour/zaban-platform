@@ -340,7 +340,7 @@
         <h3>دسترسی کامل</h3>
         {{-- قیمت و لینک خرید از سرور: جدول قیمت پنل مدیریت (Pricing) --}}
         @if ($wasPrice)
-          <div class="off-tag">{{ \App\Support\FaNum::format($launchPct) }}٪ تخفیف رونمایی</div>
+          <div class="off-tag">{{ \App\Support\FaNum::format($launchPct) }}٪ {{ $launchTitle ?: \App\Services\Pricing::LAUNCH_TITLE_DEFAULT }}</div>
           <div class="was">{{ $wasPrice }}</div>
         @endif
         <div class="price">{{ $price }}</div>

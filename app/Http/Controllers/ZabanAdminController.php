@@ -179,6 +179,9 @@ class ZabanAdminController extends Controller
             'launch_off'      => ['nullable', 'integer', 'min:0', 'max:90'],
             'launch_off_from' => ['nullable', 'string', 'max:30'],
             'launch_off_to'   => ['nullable', 'string', 'max:30'],
+            /* متن تخفیف — روی صفحه‌ی خرید و لندینگ همین نوشته می‌شود */
+            'launch_off_title' => ['nullable', 'string', 'max:40'],
+            'launch_off_note'  => ['nullable', 'string', 'max:120'],
         ], [], [
             'p1' => 'قیمت یک رشته', 'p2' => 'قیمت دو رشته', 'p3' => 'قیمت سه رشته',
             'launch_off' => 'درصد تخفیف رونمایی',
@@ -202,6 +205,8 @@ class ZabanAdminController extends Controller
             (int) ($data['launch_off'] ?? 0),
             $jal($data['launch_off_from'] ?? null),
             $jal($data['launch_off_to'] ?? null, true),
+            $data['launch_off_title'] ?? null,
+            $data['launch_off_note'] ?? null,
         );
 
         /* «1404:ce» → ['year' => 1404, 'exam' => 'ce'] */

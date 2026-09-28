@@ -67,6 +67,23 @@
     </div>
 
     <div class="field">
+      <label for="launch_off_title">متن تخفیف
+        <i>همین نوشته کنار درصد، روی صفحه‌ی خرید و لندینگ می‌آید. خالی = «تخفیف رونمایی»</i>
+      </label>
+      <input type="text" id="launch_off_title" name="launch_off_title" maxlength="40"
+             placeholder="{{ \App\Services\Pricing::LAUNCH_TITLE_DEFAULT }}"
+             value="{{ old('launch_off_title', ($launch['title'] ?? '') === \App\Services\Pricing::LAUNCH_TITLE_DEFAULT ? '' : ($launch['title'] ?? '')) }}">
+    </div>
+
+    <div class="field">
+      <label for="launch_off_note">توضیح کوتاه
+        <i>اختیاری — یک خط زیر بنر صفحه‌ی خرید، مثلاً «به مناسبت شروع سال تحصیلی»</i>
+      </label>
+      <input type="text" id="launch_off_note" name="launch_off_note" maxlength="120"
+             value="{{ old('launch_off_note', $launch['note'] ?? '') }}">
+    </div>
+
+    <div class="field">
       <label for="launch_off_from">از تاریخ
         <i>شمسی — خالی یعنی از همین حالا. امروز: {{ $jToday }}</i>
       </label>
