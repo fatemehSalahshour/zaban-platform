@@ -60,8 +60,25 @@ class ZabanController extends Controller
     {
         $exam = $req->attributes->get('zaban_exam');
         $year = $req->attributes->get('zaban_year');          /* دمو: فقط این سال؛ null = کامل */
+
+        /* رشته‌هایی که این کاربر حق دیدنشان را دارد — خریداری‌شده‌ها به‌اضافه‌ی
+           رشته‌های آزمایشی. در حالت آزمایشی هر سه رشته باز است و تنها محدودیت،
+           سهمیه‌ی کلمه است که لایه‌ی دیگری اعمالش می‌کند (نه اینجا، و نه با
+           بستن رشته یا سال).
+
+           بدون این، جدول «کجا در کنکور آمده است» دو ستونش خالی می‌ماند و
+           فیلتر رشته در تب کلمات هیچ نتیجه‌ای نمی‌دهد. */
+        $also = [];
+        if ($req->user()) {
+            $uid  = $req->user()->id;
+            $also = array_values(array_unique(array_merge(
+                $this->ent->for($uid),
+                $this->ent->demoExams($uid),
+            )));
+        }
+
         return $this->cached($req, $exam, 'core' . ($year ? "-y$year" : ''),
-                             fn () => $this->content->core($exam, $year));
+                             fn () => $this->content->core($exam, $year, $also), $also);
     }
 
     /**
@@ -87,9 +104,9 @@ class ZabanController extends Controller
      * با no-cache هر بار می‌پرسد، ولی جوابش معمولاً ۳۰۴ خالی است —
      * یک رفت‌وبرگشت ناچیز در ازای اینکه لغو دسترسی واقعاً کار کند.
      */
-    private function cached(Request $req, string $exam, string $part, callable $build)
+    private function cached(Request $req, string $exam, string $part, callable $build, array $also = [])
     {
-        $etag = $this->content->etag($exam, $part);
+        $etag = $this->content->etag($exam, $part, $also);
 
         $headers = [
             'ETag'          => $etag,

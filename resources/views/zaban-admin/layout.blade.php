@@ -93,7 +93,11 @@ th{text-align:right;font-weight:600;color:var(--ink-3);font-size:12px;
   padding:0 10px 9px;border-bottom:1px solid var(--line)}
 td{padding:10px;border-bottom:1px solid var(--line)}
 tr:last-child td{border-bottom:0}
-td.num{font-variant-numeric:tabular-nums;text-align:left;direction:ltr}
+/* عنوان ستون‌ها راست‌چین‌اند؛ اگر عدد زیرشان چپ‌چین باشد، ستون از تیترش
+   جدا می‌افتد و جدول خوانده نمی‌شود. direction:ltr می‌ماند تا خود رقم‌ها و
+   تاریخ‌ها وارونه نشوند، ولی تراز با تیتر یکی می‌شود. */
+td.num{font-variant-numeric:tabular-nums;text-align:right;direction:ltr}
+th.num{text-align:right}
 .tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:20px;
   background:var(--surface);border:1px solid var(--line-2);color:var(--ink-3)}
 .tag.gold{background:#fdf6e4;border-color:#e6d3a0;color:#8f6d1f}

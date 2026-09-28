@@ -48,14 +48,45 @@ class ContentBuilder
                 ['k' => "content_version_$e"],
                 ['v' => (string) time(), 'updated_at' => now()]
             );
-            Cache::forget("zaban.content.core.$e");
             Cache::forget("zaban.content.questions.$e");
+        }
+
+        /* هسته حالا به ازای هر ترکیب رشته یک کش دارد (چون کلمه‌های یک کاربر
+           شامل همه‌ی رشته‌های خریداری‌شده‌اش است). عوض شدن محتوای هر رشته،
+           هر ترکیبی که آن رشته در آن هست را کهنه می‌کند — پس همه را پاک
+           می‌کنیم، نه فقط کلید تک‌رشته‌ای را. تعدادشان کم است (۷ ترکیب × ۳). */
+        foreach (Entitlements::EXAMS as $primary) {
+            foreach ($this->examCombos() as $combo) {
+                Cache::forget("zaban.content.core.$primary." . implode('-', $combo));
+            }
         }
     }
 
-    public function etag(string $exam, string $part): string
+    /** همه‌ی زیرمجموعه‌های ناتهی رشته‌ها، مرتب — همان شکلی که examSet() کلید می‌سازد */
+    private function examCombos(): array
     {
-        return '"' . substr(sha1("$exam|$part|" . $this->version($exam)), 0, 20) . '"';
+        $all = Entitlements::EXAMS;
+        $out = [];
+        for ($mask = 1; $mask < (1 << count($all)); $mask++) {
+            $combo = [];
+            foreach ($all as $i => $e) if ($mask & (1 << $i)) $combo[] = $e;
+            sort($combo);
+            $out[] = $combo;
+        }
+        return $out;
+    }
+
+    /**
+     * @param string[] $also رشته‌های دیگر کاربر — در ETag می‌آید چون محتوای
+     *   هسته برای کاربر سه‌رشته‌ای با کاربر تک‌رشته‌ای فرق دارد. اگر اینجا
+     *   نباشد، مرورگر یکی ۳۰۴ می‌گیرد و محتوای ناقصِ کش‌شده را نگه می‌دارد.
+     *   نسخه‌ی همه‌ی رشته‌های دخیل هم می‌آید تا همگام‌سازی هر کدام تازه‌اش کند.
+     */
+    public function etag(string $exam, string $part, array $also = []): string
+    {
+        $exams = $this->examSet($exam, $also);
+        $vers  = implode(',', array_map(fn ($e) => $this->version($e), $exams));
+        return '"' . substr(sha1("$exam|$part|" . implode('-', $exams) . "|$vers"), 0, 20) . '"';
     }
 
     /* ================= هسته ================= */
@@ -64,21 +95,51 @@ class ContentBuilder
      * @param int|null $year  نسخه‌ی نمایشی: فقط محتوای همین سال. null = کامل.
      *   محتوای سال‌های دیگر اصلاً از سرور بیرون نمی‌رود (نه اینکه در رابط پنهان شود).
      *   کلید کش نسخه‌ی نمایشی شامل نسخه‌ی محتوا است تا bump خودکار باطلش کند.
+     *
+     * @param string[] $also  رشته‌های دیگری که این کاربر حق دیدنشان را دارد.
+     *   کلمه‌ها و متن‌ها از همه‌ی این رشته‌ها می‌آیند، چون یک کلمه معمولاً در
+     *   چند رشته آمده و کاربر باید همه‌ی ظهورهایش را ببیند — قبلاً فقط ظهورهای
+     *   رشته‌ی جاری برمی‌گشت و جدول «کجا در کنکور آمده است» دو ستونش همیشه
+     *   خالی بود، و فیلتر رشته در تب کلمات هیچ نتیجه‌ای نمی‌داد.
+     *
+     *   سال‌ها و ساختار (struct) عمداً فقط برای رشته‌ی جاری‌اند: کلیدشان
+     *   رشته ندارد و اگر ادغام شوند بخش‌های رشته‌های مختلف زیر یک سال روی هم
+     *   می‌افتند. متن‌ها این مشکل را ندارند چون کلیدشان شامل نام رشته است.
+     *
+     *   کلید کش شامل همین مجموعه است، پس کسی که یک رشته خریده هرگز پاسخ
+     *   کش‌شده‌ی کسی که سه رشته دارد را نمی‌گیرد.
      */
-    public function core(string $exam, ?int $year = null): array
+    public function core(string $exam, ?int $year = null, array $also = []): array
     {
-        $key = $year ? "zaban.content.core.$exam.y$year." . $this->version($exam) : "zaban.content.core.$exam";
-        return Cache::remember($key, 86400, function () use ($exam, $year) {
+        $exams = $this->examSet($exam, $also);
+        $tag   = implode('-', $exams);
+
+        $key = $year
+            ? "zaban.content.core.$exam.$tag.y$year." . $this->version($exam)
+            : "zaban.content.core.$exam.$tag";
+
+        return Cache::remember($key, 86400, function () use ($exam, $exams, $year) {
             return [
                 'version'   => $this->version($exam),
                 'exam'      => $exam,
                 'demo_year' => $year,
                 'years'     => $this->years($exam, $year),
                 'struct'    => $this->struct($exam, $year),
-                'words'     => $this->words($exam, $year),
-                'texts'     => $this->texts($exam, $year),
+                'words'     => $this->words($exams, $year),
+                'texts'     => $this->texts($exams, $year),
             ];
         });
+    }
+
+    /** رشته‌ی جاری اول، بقیه‌ی رشته‌های مجاز بعدش — یکتا و مرتب، تا کلید کش پایدار بماند */
+    private function examSet(string $exam, array $also): array
+    {
+        $set = array_values(array_unique(array_filter(
+            array_merge([$exam], $also),
+            fn ($e) => in_array($e, Entitlements::EXAMS, true)
+        )));
+        sort($set);
+        return $set ?: [$exam];
     }
 
     private function years(string $exam, ?int $year = null): array
@@ -117,10 +178,12 @@ class ContentBuilder
      * به‌اضافه‌ی id، که پروتوتایپ نداشت و برای مسیرهای سرور لازم است.
      *
      * اگر این شکل را عوض کنید، decode() در پروتوتایپ می‌شکند.
+     *
+     * @param string[] $exams رشته‌هایی که کاربر حق دیدنشان را دارد
      */
-    private function words(string $exam, ?int $year = null): array
+    private function words(array $exams, ?int $year = null): array
     {
-        $ids = DB::table('word_occurrences')->where('exam', $exam)
+        $ids = DB::table('word_occurrences')->whereIn('exam', $exams)
             ->when($year, fn ($q) => $q->where('year', $year))
             ->distinct()->pluck('word_id')->all();
 
@@ -132,7 +195,7 @@ class ContentBuilder
             ->orderBy('word')->get();
 
         $occ = [];
-        DB::table('word_occurrences')->whereIn('word_id', $ids)->where('exam', $exam)
+        DB::table('word_occurrences')->whereIn('word_id', $ids)->whereIn('exam', $exams)
             ->when($year, fn ($q) => $q->where('year', $year))     /* دمو: کاربرد در سال‌های دیگر هم لو نرود */
             ->orderBy('year', 'desc')
             ->get(['word_id', 'year', 'exam', 'section', 'test_number', 'passage_number'])
@@ -165,10 +228,11 @@ class ContentBuilder
         return $out;
     }
 
-    private function texts(string $exam, ?int $year = null): array
+    /** @param string[] $exams — کلید خروجی شامل نام رشته است، پس ادغام امن است */
+    private function texts(array $exams, ?int $year = null): array
     {
         $out = [];
-        DB::table('exam_texts')->where('exam', $exam)
+        DB::table('exam_texts')->whereIn('exam', $exams)
             ->when($year, fn ($q) => $q->where('year', $year))
             ->get(['year', 'exam', 'section', 'passage_number', 'body', 'body_fa'])
             ->each(function ($t) use (&$out) {
