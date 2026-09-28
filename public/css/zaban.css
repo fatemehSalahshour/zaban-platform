@@ -1618,3 +1618,46 @@ html[data-theme="dark"] .toast,html[data-theme="dim"] .toast{
 .row-f>button{white-space:nowrap}
 .row-f>button.deckbtn{flex:1 1 auto;min-width:150px}
 @media(max-width:520px){ .row-f>button{flex:1 1 calc(50% - 8px)} }
+
+/* ===== تاریخچه‌ی هر تست =====
+   نشان وضعیت («هر بار غلط»، «جبران شده» و…) روی کارت تست، در فهرست دفترچه‌ها
+   و در منتخب‌ها. رنگ‌ها از همان خانواده‌ی برچسب‌های موجودند: سبز = تسویه‌شده،
+   زرد = باز، قرمز = سرسخت، خاکستری = هنوز نزده. */
+.qst{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;line-height:1.9;
+  border:1px solid transparent;border-radius:20px;padding:1px 9px;white-space:nowrap;cursor:help}
+.qst b{font-weight:600;font-variant-numeric:tabular-nums;direction:ltr}
+.qst.q-n{background:var(--canvas);border-color:var(--line);color:var(--ink-3)}
+.qst.q-w{background:#fae2da;border-color:#eec7b8;color:#8d3617}
+.qst.q-o{background:var(--gold-soft);border-color:var(--gold-line);color:#7d6320}
+.qst.q-o2{background:var(--gold-soft);border-color:var(--gold-line);color:#7d6320}
+.qst.q-f{background:var(--accent-soft);border-color:#bcdcd2;color:var(--accent)}
+.qst.q-s{background:var(--accent-soft);border-color:#bcdcd2;color:var(--accent)}
+.qst.q-sp{background:var(--blue-soft);border-color:var(--blue-line);color:var(--blue);margin-right:5px}
+
+/* زیرعنوان کارت تست: بخش و نشان وضعیت کنار هم */
+.qsub{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* نوار نتیجه‌ها در پنجره‌ی آمار — از قدیم (چپ) به جدید (راست)، مثل نوار سال‌ها */
+.qhhead{margin:0 0 8px}
+.qhstrip{display:flex;gap:3px;flex-wrap:wrap;margin:0 0 10px}
+.qhstrip i{width:13px;height:13px;border-radius:4px;background:var(--line);cursor:help}
+.qhstrip i.ok{background:#5f9c4c}
+.qhstrip i.bad{background:#c05a35}
+.qhstrip i.blank{background:var(--line-2)}
+
+/* دسته‌های تاریخچه در تب تست‌های منتخب */
+.qstseg{margin:0 0 10px;width:fit-content;max-width:100%;flex-wrap:wrap;height:auto}
+.qstseg button{display:flex;align-items:center;gap:6px;height:36px}
+.qstseg button b{font-size:11px;font-weight:600;color:var(--ink-3);
+  background:var(--canvas);border-radius:20px;padding:0 7px;line-height:1.8}
+.qstseg button.on b{background:var(--paper);color:inherit}
+@media(max-width:560px){ .qstseg{width:100%} .qstseg button{flex:1 1 auto} }
+
+/* تم‌های تیره: پس‌زمینه‌های روشنِ ثابت باید صریح عوض شوند */
+html[data-theme="dim"] .qst.q-w,html[data-theme="dark"] .qst.q-w{background:#3a221b;border-color:#5c3527;color:#e6a88f}
+html[data-theme="dim"] .qst.q-f,html[data-theme="dark"] .qst.q-f,
+html[data-theme="dim"] .qst.q-s,html[data-theme="dark"] .qst.q-s{background:#1b2e28;border-color:#2f4c43;color:#79c4ab}
+html[data-theme="dim"] .qst.q-sp,html[data-theme="dark"] .qst.q-sp{background:#1b2637;border-color:#2e3f59;color:#8fb4e8}
+html[data-theme="dim"] .qhstrip i.ok,html[data-theme="dark"] .qhstrip i.ok{background:#4d8a3c}
+html[data-theme="dim"] .qhstrip i.bad,html[data-theme="dark"] .qhstrip i.bad{background:#a9482a}
+.qstbar{margin:0 0 10px}

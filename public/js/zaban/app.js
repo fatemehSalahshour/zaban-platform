@@ -802,7 +802,23 @@ $("#dsub").addEventListener("click",e=>{const b=e.target.closest("[data-dsub]");
   $("#deckList").hidden=b.dataset.dsub!=="w";$("#deckQList").hidden=b.dataset.dsub!=="q"});
 $("#ssub").addEventListener("click",e=>{const b=e.target.closest("[data-ssub]");if(!b)return;
   document.querySelectorAll("#ssub button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
-  $("#starList").hidden=b.dataset.ssub!=="w";$("#starQList").hidden=b.dataset.ssub!=="q"});
+  const isQ=b.dataset.ssub==="q";
+  $("#starList").hidden=isQ;$("#starQList").hidden=!isQ;
+  const seg=$("#sqstate");if(seg)seg.hidden=!isQ;
+  if(isQ)renderStarQ()});
+/* دسته‌های تاریخچه در تب تست‌های منتخب */
+(function(){const seg=$("#sqstate");if(seg)
+  seg.addEventListener("click",e=>{const b=e.target.closest("[data-sqst]");if(!b)return;
+    SF.qst=b.dataset.sqst;renderStarQ()});
+  const bar=$("#sqbar");if(bar)
+  bar.addEventListener("click",e=>{
+    if(!e.target.closest("[data-sqadd]"))return;
+    const ks=sqKeys(SF.qst).filter(k=>!deckQ.has(k));
+    if(!ks.length){toast("همه‌ی این تست‌ها از قبل در دک مرور شما هستند.");return}
+    askConfirm(`${fa(ks.length)} تست به دک مرور شما اضافه شود؟`,()=>{
+      ks.forEach(k=>deckQ.add(k));refreshAll();toast("اضافه شد.")});
+  });
+})();
 $("#dq").addEventListener("input",e=>{DF.q=e.target.value;renderDeck()});
 $("#dsec").addEventListener("click",e=>{const b=e.target.closest("[data-dsec]");if(!b)return;
   const k=b.dataset.dsec;DF.sec.has(k)?DF.sec.delete(k):DF.sec.add(k);b.classList.toggle("on");renderDeck()});
@@ -813,7 +829,7 @@ $("#clearDeck").addEventListener("click",()=>{
   if(deck.size)askConfirm(`همه‌ی ${fa(deck.size)} کلمه از دک حذف شود؟`,()=>{deck.clear();renderDeck();render()},"حذف کن");
 });
 
-const SF={q:"",sec:new Set(),year:"",exam:""};
+const SF={q:"",sec:new Set(),year:"",exam:"",qst:"star"};
 function sfWord(w){
   if(SF.q){const q=SF.q.trim();if(!w.w.includes(q)&&!meanHit(w,q))return false}
   return w.occ.some(o=>(!SF.sec.size||SF.sec.has(o[2]))&&(!SF.year||o[0]==+SF.year)&&(!SF.exam||o[1]===SF.exam));
@@ -835,16 +851,57 @@ function renderStar(){
         <span class="badge ${lvlClass(w.lvl)}">${w.lvl}</span>${secBadges(wSections(w))}</div>
         <div class="fa-mean">${listFa(w)}</div></div>
       ${actions(w)}</div>`).join("")+moreBtn(d.length-sShown,"data-smore"):'<div class="empty">کلمه‌ای با این فیلتر در منتخب‌ها نیست.</div>';
-  const qs=[...starQ].filter(sfQ);
-  $("#sqn").textContent=fa(qs.length);
+  renderStarQ();
+}
+
+/* ---- تست‌های منتخب و دسته‌های تاریخچه ----
+   «منتخب» چیزی است که خود کاربر کنار گذاشته؛ سه دسته‌ی دیگر از تاریخچه‌ی
+   واقعی ساخته می‌شوند و ربطی به ستاره ندارند — همان‌طور که در پلتفرم آزمون.
+   «تسویه‌نشده» یعنی آخرین بار غلط یا نزده، نه هر تستی که روزی غلط زده شده. */
+const SQ_TABS=[
+  ["star",  "منتخب من",          null],
+  ["open",  "اشتباه و نزده",     h=>h.state==="weak"||h.state==="open"],
+  ["weak",  "هر بار غلط زده‌ام",  h=>h.state==="weak"],
+  ["fixed", "جبران شده",         h=>h.state==="fixed"]
+];
+const SQ_EMPTY={
+  star:"تستی با این فیلتر در منتخب‌ها نیست.",
+  open:"تست تسویه‌نشده‌ای ندارید — یعنی آخرین بار همه را درست زده‌اید.",
+  weak:"خوشبختانه تستی نیست که هر بار غلط زده باشید.",
+  fixed:"هنوز تستی نیست که قبلاً غلط داشته و دو بار آخر را درست زده باشید."
+};
+function sqKeys(tab){
+  const t=SQ_TABS.find(x=>x[0]===tab)||SQ_TABS[0];
+  if(!t[2])return [...starQ].filter(sfQ);
+  /* از کل تاریخچه، نه فقط منتخب‌ها. مرتب‌سازی: دردسرسازترین اول. */
+  return Object.keys(QATT).filter(k=>t[2](qHist(k))).filter(sfQ)
+    .sort((a,b)=>{const x=qHist(a),y=qHist(b);
+      return (y.bad+y.bl)-(x.bad+x.bl) || y.n-x.n || a.localeCompare(b)});
+}
+function renderStarQ(){
+  const tab=SQ_TABS.find(x=>x[0]===SF.qst)?SF.qst:"star";
+  const qs=sqKeys(tab);
+  $("#sqn").textContent=fa(sqKeys("star").length);
+  const seg=$("#sqstate");
+  if(seg)seg.innerHTML=SQ_TABS.map(t=>{
+    const n=sqKeys(t[0]).length;
+    return `<button data-sqst="${t[0]}" class="${t[0]===tab?"on":""}">${t[1]}<b>${fa(n)}</b></button>`}).join("");
+  const bar=$("#sqbar");
+  if(bar){
+    bar.hidden=!qs.length;
+    const t=SQ_TABS.find(x=>x[0]===tab);
+    bar.innerHTML=qs.length?`<div class="count"><b>${fa(qs.length)}</b> تست در «${t[1]}»</div>
+      <button class="ghost" data-sqadd="1">افزودن همه به دک مرور…</button>`:"";
+  }
   $("#starQList").innerHTML=qs.length?qs.map(k=>{const p=k.split("|");return `
     <div class="row" data-openq="${k}">
       <div class="main"><div class="head">
         <span class="word">تست ${fa(p[2])} — کنکور ${fa(p[0])}</span>
         <span class="badge b-once">${p[1]}</span>
         <span class="badge ${qLabel(k)==="وکب"?"b-lvl-1":qLabel(k)==="کلوز تست"?"b-lvl-2":"b-sec-p"}">${qLabel(k)}</span>
+        ${qStateBadge(k,{hideNever:true})}
       </div></div>
-      ${qActs(k,"qdeck3")}</div>`}).join(""):'<div class="empty">تستی با این فیلتر در منتخب‌ها نیست.</div>';
+      ${qActs(k,"qdeck3")}</div>`}).join(""):`<div class="empty">${SQ_EMPTY[tab]}</div>`;
 }
 $("#starQList").addEventListener("click",e=>{
   const st=e.target.closest("[data-qstar3]");
@@ -1043,7 +1100,8 @@ function renderQuestion(y,e,q){
   $("#qBody").innerHTML=`
    ${backBtn()}
    <header class="qsticky"><div style="font-size:19px;font-weight:700">سؤال ${fa(q)} — کنکور ${fa(y)} ${e}</div>
-     <div style="font-size:13px;color:var(--ink-2)">${sec}${pno?" "+fa(pno):""}</div>
+     <div class="qsub"><span style="font-size:13px;color:var(--ink-2)">${sec}${pno?" "+fa(pno):""}</span>
+       ${exQ?"":qStateBadge(qk)}</div>
      <div class="row-f qtools" style="margin-top:11px">
        ${(exQ&&!EX.studyBtns)?"":`
        <button class="mini ${deckQ.has(qk)?"on":""}" data-qdeck="${qk}"
@@ -1119,8 +1177,14 @@ $("#qBody").addEventListener("click",e=>{
     /* آمار شخصی فقط با پاسخ واقعی ثبت می‌شود؛ پاسخ قفل یا ناموجود = ثبت نشود */
     fetchAns([Q.qid]).then(()=>{
       const A=ANS[Q.qid]; if(!A)return;
-      const a=qatt(k); a.n++; a.opt[i]++; if(i===A.ans)a.ok++; qattSave();
-      ZABAN.qAttempt(Q.qid,i+1);                    /* ۱ تا ۴؛ درستی را سرور حساب می‌کند */
+      /* تاریخچه فقط وقتی یکی بالا می‌رود که سرور واقعاً ثبتش کرده باشد.
+         وگرنه تلاشی که سرور رد کرده (پاسخ قفل، سقف روزانه) محلی شمرده
+         می‌شد و با اولین رفرش عددها عوض می‌شدند. */
+      const rec=ZABAN.qAttempt?ZABAN.qAttempt(Q.qid,i+1):Promise.resolve();
+      rec.then(()=>{                                /* ۱ تا ۴؛ درستی را سرور حساب می‌کند */
+        attAdd(k, i===A.ans?"c":"w", "p", i+1);
+        if(curView===v)renderQuestion(v.y,v.e,v.q);
+      }).catch(e=>console.error(e));
       if(curView===v)renderQuestion(v.y,v.e,v.q);
     }).catch(e=>console.error(e));
     return}
@@ -1327,6 +1391,7 @@ function renderTestTab(){
              <span class="bk-no">${fa(it.q)}</span>
              <span class="bk-sec">${it.label}</span>
              <span class="bk-cnt">${fa(it.ws.length)} کلمه از بانک</span>
+             ${qStateBadge(qk,{hideNever:true})}
              <span class="tacts">${grpBtns({y:E.y,e:E.e,q:it.q,keys:keys,rng:""})}</span>
              <span class="go2">دیدن سؤال ←</span></div>`;}).join("")}
     </div>`).join(""):'<div class="empty">با این فیلترها تستی پیدا نشد.</div>';
@@ -3140,6 +3205,8 @@ function qTools(it,big){
   const verdict=R?(a===undefined?"skip":a===Q.ans?"ok":"bad"):"";
   return `<div class="ex-tools">
       ${R?`<span class="ex-vd ${verdict}">${verdict==="ok"?"درست":verdict==="bad"?"غلط":"نزده"}</span>`:""}
+      ${/* تاریخچه فقط در کارنامه؛ سر جلسه دیدنِ «همیشه درست» خودش یک سرنخ است */
+        R?qStateBadge(qk,{hideNever:true}):""}
       ${(!R&&EX.mode==="wb")?`<button class="ib ib-l" data-rev="${it.q}">${EX.rev[it.q]?"بستن پاسخ":"پاسخ"}</button>`:""}
       <button class="ib ${EX.bm[it.q]?"on":""}" data-bm="${it.q}" data-tip="نشان کردن این تست برای بازگشت بعدی">${EX.bm[it.q]?BM_ON:BM_OFF}</button>
       ${nBtn(nk,"یادداشت تست "+fa(it.q)+" — کنکور "+fa(EX.y)+" "+EX.e)}
@@ -3284,6 +3351,20 @@ function finishTail(){
   histAdd({ts:Date.now(),y:EX.y,e:EX.e,mode:EX.mode,dur:EX.dur,ans:Object.assign({},EX.ans),
            right:R.right,wrong:R.wrong,blank:R.blank,used:R.used,bySec:R.bySec,pct:R.pct});
   actAdd("q",R.right+R.wrong);actAdd("qOk",R.right);
+  /* تاریخچه‌ی تک‌تک تست‌های این آزمون — همان چیزی که سرور هم از exam_answers
+     می‌سازد؛ اینجا محلی اضافه می‌شود تا نشان‌ها بدون رفرش درست باشند.
+     تستی که کلید پاسخش نیامده (سقف روزانه) قضاوت نمی‌شود.
+
+     فقط برای آزمونی که سرور تصحیحش کرده: آزمونِ محلی (وقتی تصحیح سرور
+     نیامده) در exam_answers ردیفی ندارد، پس با اولین رفرش همه‌ی این
+     نشان‌ها پاک می‌شدند و عددها می‌پریدند. */
+  if(EX.attemptId)EX.items.forEach(it=>{
+    const k=qKey(EX.y,EX.e,it.q), a=EX.ans[it.q];
+    if(a===undefined){attAdd(k,"b","e",null);return}
+    const right=it.Q?it.Q.ans:null;
+    if(right==null)return;
+    attAdd(k,a===right?"c":"w","e",a+1);
+  });
   closeModals();
   $("#examHome").hidden=true;$("#examRes").hidden=true;$("#examRun").hidden=false;
   paintRun();
@@ -3540,13 +3621,131 @@ function sparkOf(ys,title){
     return `<i class="${hit?"hit":""}" data-tip="${fa(y)}${hit?" — آمده":" — نیامده"}"></i>`}).join("")}</div>`;
 }
 
-/* ================= تمرین تست و آمار آن ================= */
-/* QATT[qk] = {n, ok, opt:[c1,c2,c3,c4]}  — تلاش‌های تمرینی خودِ کاربر روی هر تست.
-   از سرور (question_attempts، از راه /me در mem.zban_qatt)؛ با هر زدن یکی محلی
-   بالا می‌رود و همزمان به سرور فرستاده می‌شود. */
-const QATT = LS.get("zban_qatt") || {};
-function qatt(k){return QATT[k] || (QATT[k]={n:0, ok:0, opt:[0,0,0,0]})}
-function qattSave(){LS.set("zban_qatt",QATT)}
+/* ================= تاریخچه‌ی هر تست =================
+   QATT[qk] = {n, ok, bad, bl, opt:[c1..c4], h:"cwb…", s:"pe…"}
+
+   h نتیجه‌ی هر بار روبه‌رو شدن است به ترتیب زمان، از قدیم به جدید:
+     c درست   w غلط   b نزده
+   و s منبع همان نتیجه: p تمرین تک‌تست، e آزمون.
+
+   از سرور می‌آید (App\Services\QuestionHistory، از راه /me در mem.zban_qatt)
+   که تمرین‌ها (question_attempts) و آزمون‌های تمام‌شده (exam_answers، با نزده)
+   را روی یک خط زمانی می‌چیند. با هر پاسخ تازه، همین‌جا هم یکی اضافه می‌شود تا
+   نشان‌ها بدون رفرش به‌روز باشند.
+
+   نسخه‌ی قبل فقط n و ok داشت. با یک جمعِ بی‌ترتیب نمی‌شد گفت «آخرین بار غلط
+   زده» یا «دو بار آخر درست زده»، و «نزده» هیچ‌جا شمرده نمی‌شد. */
+const QH_KEEP = 24;            /* چند نتیجه‌ی آخر در h بماند (n کامل می‌ماند) */
+
+function normAtt(a){
+  a = a || {};
+  const o = {
+    n:  +a.n  || 0, ok: +a.ok || 0, bad: +a.bad || 0, bl: +a.bl || 0,
+    opt: Array.isArray(a.opt) && a.opt.length === 4 ? a.opt.map(x => +x || 0) : [0,0,0,0],
+    h: typeof a.h === "string" ? a.h : "",
+    s: typeof a.s === "string" ? a.s : ""
+  };
+  /* ردیف کهنه‌ی مرورگر (پیش از این نسخه) فقط n و ok داشت: تعداد را می‌دانیم،
+     ترتیب را نه. به‌جای ساختن یک ترتیب ساختگی، بی‌ترتیب علامت می‌خورد و
+     وضعیتش محتاطانه حساب می‌شود. با اولین بارگذاری از سرور جایش پر می‌شود. */
+  if(!o.h && o.n){ o.bad = Math.max(o.bad, o.n - o.ok - o.bl); o.unordered = true }
+  return o;
+}
+const QATT = (() => {
+  const raw = LS.get("zban_qatt") || {}, out = {};
+  for(const k in raw) out[k] = normAtt(raw[k]);
+  return out;
+})();
+function qatt(k){ return QATT[k] || (QATT[k] = normAtt(null)) }
+function qattSave(){ LS.set("zban_qatt", QATT) }
+
+/* یک نتیجه‌ی تازه — از تمرین تک‌تست یا از پایان آزمون */
+function attAdd(k, r, src, chosen){
+  const a = qatt(k);
+  a.n++;
+  if(r === "c") a.ok++; else if(r === "w") a.bad++; else a.bl++;
+  if(chosen >= 1 && chosen <= 4) a.opt[chosen-1]++;
+  a.h = (a.h + r).slice(-QH_KEEP);
+  a.s = (a.s + (src || "p")).slice(-QH_KEEP);
+  a.unordered = false;
+  qattSave();
+}
+
+/* ---- وضعیت هر تست، از روی تاریخچه‌اش ----
+     never   هنوز روبه‌رو نشده
+     weak    دو بار یا بیشتر غلط/نزده و هیچ‌وقت درست — سرسخت‌ترین‌ها
+     open    آخرین بار غلط یا نزده بوده — هنوز تسویه نشده
+     open2   قبلاً غلط داشته ولی آخرین بار درست زده
+     fixed   قبلاً غلط داشته و دو بار آخر درست — جبران شده
+     solid   هر بار درست
+   عمداً از ترتیب حساب می‌شود، نه از یک نشانه‌ی چسبنده: سوالی که یک بار در
+   گذشته غلط زده شده و بعدش پنج بار درست، نباید تا ابد «اشتباه» بماند. */
+const QH_FA = {never:"هنوز نزده‌اید", weak:"هر بار غلط", open:"آخرین بار درست نزدید",
+               open2:"قبلاً غلط داشته", fixed:"جبران شده", solid:"همیشه درست"};
+const QH_TIP = {
+  never:"هنوز با این تست روبه‌رو نشده‌اید.",
+  weak:"دو بار یا بیشتر غلط زده‌اید یا نزده‌اید و هیچ‌وقت درستش نزده‌اید.",
+  open:"آخرین باری که با این تست روبه‌رو شدید، غلط زدید یا نزدید — هرچند ممکن است پیش‌تر درست زده باشید.",
+  open2:"قبلاً غلط داشته، ولی آخرین بار درست زدید. یک بار دیگر درست بزنید تا «جبران شده» شود.",
+  fixed:"قبلاً غلط داشته و دو بار آخر را درست زده‌اید — از فهرست تسویه‌نشده‌ها بیرون آمده.",
+  solid:"هر بار که دیده‌اید درست زده‌اید."};
+const QH_CLS = {never:"n", weak:"w", open:"o", open2:"o2", fixed:"f", solid:"s"};
+const QH_SRC_FA = {p:"تمرین", e:"آزمون"};
+
+function qHist(k){
+  const a = QATT[k];
+  if(!a || !a.n) return {n:0, ok:0, bad:0, bl:0, h:"", s:"", state:"never", speed:false};
+  const wrong = a.bad + a.bl, h = a.h || "";
+  let state;
+  if(a.unordered || !h){
+    /* ترتیب را نداریم: فقط چیزی می‌گوییم که از جمع‌ها قطعی است */
+    state = a.ok === 0 && a.n >= 2 ? "weak" : (wrong ? "open2" : "solid");
+  }else{
+    const last = h[h.length-1], last2 = h.slice(-2);
+    if(a.ok === 0 && a.n >= 2)        state = "weak";
+    else if(last !== "c")             state = "open";
+    else if(wrong && last2 === "cc")  state = "fixed";
+    else if(wrong)                    state = "open2";
+    else                              state = "solid";
+  }
+  /* در تمرین درست می‌زنید و در آزمون غلط: مسئله یادگیری نیست، سرعت است */
+  let pN=0, pOk=0, eBad=0;
+  for(let i=0;i<h.length;i++){
+    const src = (a.s||"")[i] || "p";
+    if(src === "p"){ pN++; if(h[i]==="c") pOk++ }
+    else if(h[i] !== "c") eBad++;
+  }
+  return {n:a.n, ok:a.ok, bad:a.bad, bl:a.bl, h, s:a.s||"", state,
+          speed: pN>0 && pOk===pN && eBad>0};
+}
+
+/* نشان وضعیت روی کارت و در فهرست‌ها.
+   opts.hideNever: در فهرست‌های شلوغ، «هنوز نزده‌اید» روی هر ردیف نویز است. */
+function qStateBadge(k, opts){
+  const H = qHist(k), o = opts || {};
+  if(!H.n && o.hideNever) return "";
+  if(!H.n) return `<span class="qst q-n" data-tip="${QH_TIP.never}">${QH_FA.never}</span>`;
+  const parts = [`${fa(H.ok)} درست`];
+  if(H.bad) parts.push(`${fa(H.bad)} غلط`);
+  if(H.bl)  parts.push(`${fa(H.bl)} نزده`);
+  const tip = `${QH_TIP[H.state]}<br>${fa(H.n)} بار روبه‌رو شده‌اید: ${parts.join("، ")}`;
+  return `<span class="qst q-${QH_CLS[H.state]}" data-tip="${tip}">${QH_FA[H.state]}
+    <b dir="ltr">${fa(H.ok)}/${fa(H.n)}</b></span>${H.speed
+    ? `<span class="qst q-sp" data-tip="در تمرین درست می‌زنید ولی سر آزمون غلط — مسئله سرعت است، نه یادگیری">سرعت</span>`
+    : ""}`;
+}
+
+/* نوار نتیجه‌ها، قدیم → جدید. همان زبان بصری نوار سال‌ها. */
+function qHistStrip(k){
+  const H = qHist(k);
+  if(!H.h) return "";
+  const fam = {c:"ok", w:"bad", b:"blank"}, nameFa = {c:"درست", w:"غلط", b:"نزده"};
+  const cells = H.h.split("").map((r,i)=>{
+    const src = H.s[i] || "p";
+    return `<i class="${fam[r]||""}" data-tip="${nameFa[r]||""} — ${QH_SRC_FA[src]||"تمرین"}"></i>`;
+  }).join("");
+  return `<div class="qhstrip" dir="ltr">${cells}</div>`;
+}
 
 /* ===== آمار جمعی از سرور =====
    GET /api/crowd فقط رشته‌های خریده‌شده و فقط «نرخ»ها را می‌دهد. توزیع گزینه‌ها
@@ -3596,18 +3795,30 @@ function bars(rows,max){
     </div>`).join("")}</div>`;
 }
 function qStatsHTML(y,e,q,Q){
-  const k=qKey(y,e,q), me=QATT[k];
+  const k=qKey(y,e,q), H=qHist(k);
   loadQStat(Q.qid);
   const g=QSTAT[Q.qid];
-  const meMax=me?Math.max(me.ok,me.n-me.ok,1):1;
+  const meMax=Math.max(H.ok,H.bad,H.bl,1);
+  /* تفکیک منبع: تمرین تک‌تست از آزمونِ زمان‌دار جدا شمرده می‌شود، چون
+     «در تمرین بلدم، سر آزمون نه» یک مسئله‌ی متفاوت است. */
+  const bySrc=(src)=>{let n=0,ok=0;for(let i=0;i<H.h.length;i++){
+    if((H.s[i]||"p")!==src)continue; n++; if(H.h[i]==="c")ok++} return {n,ok}};
+  const P=bySrc("p"), E2=bySrc("e");
+  const srcLine=[P.n?`${fa(P.n)} بار در تمرین (${fa(P.ok)} درست)`:"",
+                 E2.n?`${fa(E2.n)} بار سر آزمون (${fa(E2.ok)} درست)`:""].filter(Boolean).join(" · ");
   return `
   <div class="qstat">
     <div class="label" style="margin:0 0 8px">عملکرد شما در این تست</div>
-    ${me&&me.n?bars([
-        ["درست", me.ok, "#5f9c4c", `از ${fa(me.n)} بار`],
-        ["غلط",  me.n-me.ok, "#c05a35", ""],
-      ],meMax)
-      +`<div class="capt" style="margin:8px 0 0">این تست را ${fa(me.n)} بار زده‌اید و ${fa(Math.round(me.ok/me.n*100))} درصد درست بوده است.</div>`
+    ${H.n?`<div class="qhhead">${qStateBadge(k)}</div>
+      ${qHistStrip(k)}
+      ${bars([
+        ["درست", H.ok,  "#5f9c4c", `از ${fa(H.n)} بار`],
+        ["غلط",  H.bad, "#c05a35", ""],
+        ["نزده", H.bl,  "#b9bec4", ""],
+      ],meMax)}
+      <div class="capt" style="margin:8px 0 0">${fa(H.n)} بار با این تست روبه‌رو شده‌اید و
+        ${H.ok+H.bad?`${fa(Math.round(H.ok/(H.ok+H.bad)*100))} درصد از پاسخ‌هایتان درست بوده است`:"هنوز پاسخی ثبت نکرده‌اید"}.${
+        srcLine?`<br>${srcLine}`:""}</div>`
       :`<div class="capt" style="margin:0">هنوز این تست را نزده‌اید. یکی از گزینه‌ها را انتخاب کنید تا آمارتان ساخته شود.</div>`}
 
     <div class="label" style="margin:14px 0 8px">عملکرد همه‌ی کاربران</div>

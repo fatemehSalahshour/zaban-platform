@@ -207,9 +207,20 @@ window.ZABAN = (function () {
   const queue = [];
   let flushing = false;
 
+  /* نتیجه‌ی نوشتن قابل انتظار است.
+     چرا لازم شد: تا حالا هر نوشتن «بفرست و فراموش کن» بود. برای دک و
+     یادداشت اشکالی ندارد، ولی برای تاریخچه‌ی تست اشکال داشت: صفحه یک
+     تلاش را محلی می‌شمرد حتی وقتی سرور ردش کرده بود (پاسخ قفل، سقف
+     روزانه، بی‌حق دسترسی)، و با اولین رفرش عددها عوض می‌شدند.
+     حالا هر صدا زدن یک Promise می‌گیرد که با همان سرنوشتِ واقعیِ درخواست
+     تمام می‌شود — بعد از همه‌ی تلاش‌های دوباره‌ی صف. */
   function push(method, path, body) {
-    queue.push({ method, path, body, tries: 0 });
+    let done, fail;
+    const p = new Promise((res, rej) => { done = res; fail = rej; });
+    p.catch(() => {});                 /* تا اگر کسی منتظرش نماند، خطای بی‌صاحب نسازد */
+    queue.push({ method, path, body, tries: 0, done, fail });
     flush();
+    return p;
   }
 
   async function flush() {
@@ -218,12 +229,13 @@ window.ZABAN = (function () {
     while (queue.length) {
       const job = queue[0];
       try {
-        await req(job.method, job.path, job.body);
+        const out = await req(job.method, job.path, job.body);
         queue.shift();
+        if (job.done) job.done(out);
       } catch (e) {
-        if (e.halt || e.retryable === false) { queue.shift(); continue; }
+        if (e.halt || e.retryable === false) { queue.shift(); if (job.fail) job.fail(e); continue; }
         job.tries++;
-        if (job.tries > 4) { queue.shift(); console.warn('رها شد:', job, e); continue; }
+        if (job.tries > 4) { queue.shift(); console.warn('رها شد:', job, e); if (job.fail) job.fail(e); continue; }
         await new Promise(r => setTimeout(r, 1000 * job.tries));
       }
     }
@@ -352,9 +364,15 @@ window.ZABAN = (function () {
     window.CONTENT_EXAM = content.exam || null;
     window.NEW_TODAY = me.new_today || 0;
 
-    /* آمار تمرینی خود کاربر روی هر سؤال — قبلاً فقط در مرورگر (zban_qatt) */
+    /* تاریخچه‌ی هر تست از سرور (QuestionHistory): تمرین‌ها و آزمون‌های
+       تمام‌شده روی یک خط زمانی. h نتیجه‌ها به ترتیب (c/w/b) و s منبعشان
+       (p تمرین، e آزمون). صفحه از همین، وضعیت هر تست را می‌سازد.
+       نسخه‌ی قبل فقط n و ok داشت، پس «آخرین بار» و «نزده» را نمی‌دانست. */
     mem.zban_qatt = {};
-    (me.qatt || []).forEach(a => { mem.zban_qatt[a.k] = { n: a.n, ok: a.ok, opt: a.opt }; });
+    (me.qatt || []).forEach(a => {
+      mem.zban_qatt[a.k] = { n: a.n || 0, ok: a.ok || 0, bad: a.bad || 0, bl: a.bl || 0,
+                             opt: a.opt || [0, 0, 0, 0], h: a.h || '', s: a.s || '' };
+    });
 
     /* فعالیت روزانه از سرور (daily_activity)، به همان شکلی که صفحه در
        zban_act نگه می‌دارد. در mem، پس بر نسخه‌ی مرورگر مقدم است. */
@@ -570,7 +588,10 @@ window.ZABAN = (function () {
       catch (e) { if (String(e.message).includes('409')) return { locked: true }; throw e; }
     },
     /** یک بار زدن سؤال در تمرین؛ chosen از ۱ تا ۴ */
-    qAttempt(qid, chosen) { if (qid) push('POST', '/question/' + qid + '/attempt', { chosen }); },
+    qAttempt(qid, chosen) {
+      return qid ? push('POST', '/question/' + qid + '/attempt', { chosen })
+                 : Promise.reject(new Error('no question id'));
+    },
 
     buyQuote(exams) { return req('GET', '/buy/quote?exams=' + exams.join(',')); },
     buyOrder(exams) { return req('POST', '/buy/order', { exams }); },

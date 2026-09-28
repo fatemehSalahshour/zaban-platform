@@ -627,17 +627,16 @@ class ZabanController extends Controller
                 'is_admin' => in_array($user->type ?? 'student', ['admin', 'manager', 'editor'], true),
             ],
             'deck'  => $deck,
-            /* تلاش‌های تمرینی خود کاربر روی هر سؤال — «این تست را n بار زده‌اید» */
-            'qatt' => rescue(fn () => DB::table('question_attempts as a')->join('questions as q', 'q.id', '=', 'a.question_id')
-                ->where('a.user_id', $user->id)
-                ->groupBy('a.question_id', 'q.year', 'q.exam', 'q.question_number')
-                ->selectRaw('q.year, q.exam, q.question_number, COUNT(*) AS n, SUM(a.is_correct) AS ok,
-                             SUM(a.chosen = 1) AS o1, SUM(a.chosen = 2) AS o2, SUM(a.chosen = 3) AS o3, SUM(a.chosen = 4) AS o4')
-                ->get()->map(fn ($x) => [
-                    'k' => $x->year . '|' . (ContentBuilder::EXAM_FA[$x->exam] ?? $x->exam) . '|' . (int) $x->question_number,
-                    'n' => (int) $x->n, 'ok' => (int) $x->ok,
-                    'opt' => [(int) $x->o1, (int) $x->o2, (int) $x->o3, (int) $x->o4],
-                ])->values(), []),
+            /* تاریخچه‌ی هر تست برای همین کاربر — تمرین‌ها به‌علاوه‌ی آزمون‌های
+               تمام‌شده (با «نزده»)، به ترتیب زمان. رابط از روی همین، وضعیت هر
+               تست را می‌سازد: «هر بار غلط»، «جبران شده»، «هنوز نزده‌اید» و… */
+            'qatt' => rescue(fn () => app(\App\Services\QuestionHistory::class)->forUser($user->id),
+                /* خالی برگرداندنِ بی‌صدا بدترین حالت است: تاریخچه‌ی همه صفر می‌شود
+                   و هیچ نشانه‌ای از علتش نمی‌ماند. پس دست‌کم در لاگ می‌نویسیم. */
+                function ($e) {
+                    \Illuminate\Support\Facades\Log::warning('qatt failed: ' . $e->getMessage());
+                    return [];
+                }),
             /* فعالیت روزانه‌ی یک سال اخیر — ردیف «شما» در رتبه‌بندی و روند هفتگی
                داشبورد از همین ساخته می‌شوند. قبلاً فقط از حافظه‌ی مرورگر می‌آمد
                و در مرورگر دیگر همه صفر بود. */

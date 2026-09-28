@@ -207,6 +207,9 @@
     <button data-ssub="w" class="on">کلمات (<b id="swn">۰</b>)</button>
     <button data-ssub="q">تست‌ها (<b id="sqn">۰</b>)</button>
   </div>
+  {{-- دسته‌های تاریخچه‌ی تست — دکمه‌ها را خود app.js با شمارنده می‌سازد --}}
+  <div class="seg qstseg" id="sqstate" hidden></div>
+  <div class="resbar qstbar" id="sqbar" hidden></div>
   <div class="list" id="starList"></div>
   <div class="list" id="starQList" hidden></div>
 </div>
