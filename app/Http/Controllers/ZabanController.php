@@ -274,7 +274,9 @@ class ZabanController extends Controller
     public function crowd(Request $req): JsonResponse
     {
         $q = []; $w = [];
-        $ttl = app()->environment('local') ? 5 : 600;
+        /* ۹۰ ثانیه، نه ده دقیقه: آمار جمعی باید تقریباً زنده باشد. کوئری‌اش
+           گروه‌بندی ساده روی دو جدول است و بار سنگینی ندارد. */
+        $ttl = app()->environment('local') ? 5 : 90;
         foreach ($this->ent->for($req->user()->id) as $code) {
             $part = cache()->remember("zaban.crowd.$code", $ttl, fn () => $this->crowdFor($code));
             $q += $part['q'];
@@ -287,16 +289,39 @@ class ZabanController extends Controller
     {
         $min = $this->crowdMin();
 
-        $q = DB::table('exam_answers as a')
+        /* دو منبع، هر دو معتبر:
+             ۱) آزمون‌های تمام‌شده (نزده هم دارند)
+             ۲) تست‌هایی که کاربر بیرون از آزمون زده — تمرین تک‌تست
+
+           تا این نسخه فقط آزمون‌ها شمرده می‌شدند، پس کسی که یک دفترچه را
+           تست‌به‌تست کار کرده بود در آمار جمعی اثری نداشت؛ روی پلتفرم تازه
+           که هنوز آزمون کاملی داده نشده، یعنی آمار همیشه خالی. */
+        $exam = DB::table('exam_answers as a')
             ->join('exam_attempts as t', 't.id', '=', 'a.attempt_id')
             ->join('questions as q', 'q.id', '=', 'a.question_id')
             ->whereNotNull('t.finished_at')->where('q.exam', $code)
             ->groupBy('a.question_id')
-            ->havingRaw('COUNT(*) >= ?', [$min])
             ->selectRaw('a.question_id, COUNT(*) AS n, SUM(a.is_correct = 1) AS r, SUM(a.chosen IS NULL) AS b')
-            ->get()
-            ->mapWithKeys(fn ($x) => [(int) $x->question_id => [(int) $x->n, (int) $x->r, (int) $x->b]])
-            ->all();
+            ->get();
+
+        $practice = DB::table('question_attempts as a')
+            ->join('questions as q', 'q.id', '=', 'a.question_id')
+            ->where('q.exam', $code)
+            ->groupBy('a.question_id')
+            /* تمرین همیشه پاسخ دارد، پس «نزده» ندارد */
+            ->selectRaw('a.question_id, COUNT(*) AS n, SUM(a.is_correct = 1) AS r, 0 AS b')
+            ->get();
+
+        $q = [];
+        foreach ([$exam, $practice] as $set) {
+            foreach ($set as $x) {
+                $id = (int) $x->question_id;
+                $row = $q[$id] ?? [0, 0, 0];
+                $q[$id] = [$row[0] + (int) $x->n, $row[1] + (int) $x->r, $row[2] + (int) $x->b];
+            }
+        }
+        /* سقف روی مجموع دو منبع اعمال می‌شود، نه جداگانه */
+        $q = array_filter($q, fn ($v) => $v[0] >= $min);
 
         /* هر نفر یک بار: آخرین امتیاز هر کاربر روی هر کلمه. کسی که ده بار
            «یادم نبود» زده و آخرش یاد گرفته، یک نفرِ «بلد» است. */
@@ -333,16 +358,23 @@ class ZabanController extends Controller
             return response()->json(['error' => 'answer_locked'], 409);
         }
 
+        /* مثل آمار جمعی: آزمون‌های تمام‌شده به‌علاوه‌ی تمرین‌های تک‌تست */
         $rows = DB::table('exam_answers as a')
             ->join('exam_attempts as t', 't.id', '=', 'a.attempt_id')
             ->whereNotNull('t.finished_at')->where('a.question_id', $id)
             ->groupBy('a.chosen')->selectRaw('a.chosen, COUNT(*) AS n')->pluck('n', 'chosen');
 
+        $practice = DB::table('question_attempts')
+            ->where('question_id', $id)
+            ->groupBy('chosen')->selectRaw('chosen, COUNT(*) AS n')->pluck('n', 'chosen');
+
         $opt = [0, 0, 0, 0]; $blank = 0; $total = 0;
-        foreach ($rows as $chosen => $n) {
-            $total += (int) $n;
-            if ($chosen === '' || $chosen === null) { $blank += (int) $n; continue; }
-            if ($chosen >= 1 && $chosen <= 4) $opt[(int) $chosen - 1] += (int) $n;
+        foreach ([$rows, $practice] as $set) {
+            foreach ($set as $chosen => $n) {
+                $total += (int) $n;
+                if ($chosen === '' || $chosen === null) { $blank += (int) $n; continue; }
+                if ($chosen >= 1 && $chosen <= 4) $opt[(int) $chosen - 1] += (int) $n;
+            }
         }
         if ($total < $this->crowdMin()) return response()->json(['total' => 0]);
 
