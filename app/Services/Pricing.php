@@ -173,6 +173,9 @@ class Pricing
         $billable = array_values(array_diff($exams, $owned));
         sort($billable);
 
+        /* رشته‌هایی که از قبل دارد — مبنای «اعتبار خرید قبلی» */
+        $ownedAll = count(array_unique(array_intersect($owned, Entitlements::EXAMS)));
+
         $n = count($billable);
         if ($n === 0) {
             return ['exams' => $exams, 'billable' => [], 'already_owned' => $already,
@@ -180,8 +183,25 @@ class Pricing
                     'price_version' => $this->version()];
         }
 
-        $list    = $n * $unit;
-        $bundled = $bundle[$n] ?? $list;
+        $list  = $n * $unit;
+        $stair = $bundle[$n] ?? $list;           /* پلکان عادی روی همین سفارش */
+
+        /* اعتبار خرید قبلی.
+           بدون این، کسی که اول یک رشته خریده و بعد دو تای دیگر را می‌خواهد،
+           ۱٬۳۵۰٬۰۰۰ می‌داد؛ یعنی در مجموع ۲٬۵۵۰٬۰۰۰ در برابر ۱٬۵۰۰٬۰۰۰ کسی
+           که همان روز اول هر سه را خریده بود. عملاً جریمه‌ی تصمیم مرحله‌به‌مرحله.
+
+           حالا مبلغ = قیمت پکیجِ نهایی منهای قیمت پکیجی که قبلاً پرداخته، و
+           هیچ‌وقت بیشتر از قیمت همین سفارش به‌تنهایی. یعنی هر مسیری که کاربر
+           برود، در نهایت همان مبلغ پکیج کامل را می‌دهد، نه بیشتر. */
+        $upgrade = 0;
+        $bundled = $stair;
+        if ($ownedAll > 0) {
+            $after  = min($ownedAll + $n, 3);
+            $credit = ($bundle[$after] ?? $list) - ($bundle[min($ownedAll, 3)] ?? 0);
+            $bundled = max(0, min($stair, $credit));
+            $upgrade = $stair - $bundled;
+        }
 
         /* تخفیف رونمایی روی مبلغ بعد از تخفیف پلکانی می‌نشیند.
            رند به ۱۰۰۰ تومان پایین، تا مبلغ درگاه عدد گنگ نشود. */
@@ -200,6 +220,10 @@ class Pricing
             /* «تخفیف» جمع هر دو است — همان عددی که کاربر صرفه‌جویی می‌کند */
             'discount'      => $list - $payable,
             'bundle_price'  => $bundled,
+            /* تفکیک تخفیف، برای خط‌های خلاصه‌ی سفارش */
+            'stair_off'     => $list - $stair,
+            'upgrade_off'   => $upgrade,
+            'owned_count'   => $ownedAll,
             'launch_off'    => $launch,
             'launch_pct'    => $off['active'] ? $off['percent'] : 0,
             'launch_title'  => $off['active'] ? $off['title'] : null,

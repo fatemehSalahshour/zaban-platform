@@ -47,8 +47,11 @@ class Checkout
         if (!$q['billable']) {
             throw new RuntimeException('همه‌ی رشته‌های انتخابی از قبل برای شما فعال است.');
         }
+        /* مبلغ صفر با اعتبار خرید قبلی ممکن است (مثلاً مدیر پکیج‌ها را طوری
+           قیمت‌گذاری کند که رشته‌ی سوم رایگان شود). درگاه مبلغ صفر نمی‌گیرد،
+           پس همین‌جا فعال می‌کنیم — نه اینکه کاربر را با خطا برگردانیم. */
         if ($q['payable'] <= 0) {
-            throw new RuntimeException('مبلغ سفارش نامعتبر است.');
+            return $this->grantFree($userId, $q);
         }
 
         $amountRial = (int) $q['payable'] * 10;      /* قیمت‌ها تومان‌اند؛ درگاه ریال می‌گیرد */
@@ -207,6 +210,42 @@ class Checkout
     }
 
     /* ---------------------------------------------------------------- */
+
+    /**
+     * سفارش بی‌پرداخت: ثبت می‌شود و دسترسی فوراً داده می‌شود.
+     * @return array{order_id:int, token:string, pay_url:string, free:true}
+     */
+    private function grantFree(int $userId, array $q): array
+    {
+        $orderId = DB::table('zaban_orders')->insertGetId([
+            'user_id'       => $userId,
+            'status'        => 'pending',
+            'exams'         => implode(',', $q['billable']),
+            'list_price'    => $q['list_price'],
+            'discount'      => $q['discount'],
+            'payable'       => 0,
+            'amount_rial'   => 0,
+            'price_version' => $q['price_version'],
+            'expires_at'    => $this->pricing->accessUntil(),
+            'gateway'       => 'free',
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
+
+        DB::transaction(function () use ($orderId, $userId, $q) {
+            DB::table('zaban_orders')->where('id', $orderId)->update([
+                'status' => 'paid', 'gateway_code' => '00',
+                'paid_at' => now(), 'updated_at' => now(),
+            ]);
+            foreach ($q['billable'] as $exam) {
+                $this->ent->grant($userId, $exam, $this->pricing->accessUntil(), 'purchase', $orderId);
+            }
+        });
+        $this->ent->forget($userId);
+        Log::info('[Checkout] free grant', ['order' => $orderId, 'user' => $userId]);
+
+        return ['order_id' => $orderId, 'token' => '', 'pay_url' => '', 'free' => true];
+    }
 
     private function markPaid(int $orderId): void
     {

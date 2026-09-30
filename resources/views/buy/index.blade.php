@@ -57,6 +57,8 @@
        border-top:1px solid var(--line);margin-top:10px;padding-top:12px}
   .sum .total .v{font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
   .sum .was{font-size:12.5px;color:var(--ink-3);text-decoration:line-through;font-variant-numeric:tabular-nums}
+  .sum .line.note{font-size:12px;color:var(--ink-3);line-height:1.9;border:0;padding-top:2px}
+  .sum .line.note span{max-width:100%}
   .sum .savebox{background:#fdeed3;color:#8a5206;border-radius:10px;padding:9px 12px;font-size:13px;
        margin-top:10px;font-weight:500}
   .cta{display:block;width:100%;text-align:center;background:var(--ok);color:#fff;border:0;border-radius:12px;
@@ -105,7 +107,7 @@
             <div class="box">✓</div>
             <div style="flex:1">
               <h4>کلمات ارشد {{ $name }}</h4>
-              <div class="d">تمام کلمات وکب، کلوز تست و پسیج آزمون {{ $name }}@if ($st['y1'] && $st['y2']) از {{ \App\Support\FaNum::format($st['y1']) }} تا {{ \App\Support\FaNum::format($st['y2']) }}@endif</div>
+              <div class="d">تمام کلمات وکب، کلوز تست و پسیج آزمون {{ $name }}@if ($st['y1'] && $st['y2']) از {{ \App\Support\FaNum::digits($st['y1']) }} تا {{ \App\Support\FaNum::digits($st['y2']) }}@endif</div>
               <div class="tags">
                 <span class="tag">{{ \App\Support\FaNum::format($st['years']) }} سال</span>
                 <span class="tag">{{ \App\Support\FaNum::format($st['words']) }} کلمه‌ی یکتا</span>
@@ -195,12 +197,20 @@
       if(!r.ok)throw new Error(r.status);
       const q=await r.json(); if(my!==seq)return;
 
+      /* سه خط تخفیف، هر کدام فقط وقتی عددی دارد:
+         پلکان همین سفارش، اعتبار خرید قبلی، و تخفیف مدت‌دار. */
+      const offLine=(t,v)=>`<div class="line off"><span>${t}</span><b>− ${money(v)}</b></div>`;
+      const offs=[];
+      if(q.stair_off>0)   offs.push(offLine('تخفیف پلکانی', q.stair_off));
+      if(q.upgrade_off>0) offs.push(offLine('اعتبار خرید قبلی', q.upgrade_off));
+      if(q.launch_off>0)  offs.push(offLine(`${q.launch_title||'تخفیف'} (${Number(q.launch_pct).toLocaleString('fa-IR')}٪)`, q.launch_off));
+      if(!offs.length)    offs.push(`<div class="line off"><span>تخفیف پلکانی</span><b>− ۰</b></div>`);
+
       lines.innerHTML=(q.lines||[]).map(l=>`<div class="line"><span>${l.name}</span><b>${money(l.price)}</b></div>`).join('')
-        +(q.launch_off>0
-            ? `<div class="line off"><span>تخفیف پلکانی</span><b>− ${money(q.list_price-q.bundle_price)}</b></div>`
-              +`<div class="line off"><span>${q.launch_title||'تخفیف'} (${Number(q.launch_pct).toLocaleString('fa-IR')}٪)</span><b>− ${money(q.launch_off)}</b></div>`
-            : (q.discount>0?`<div class="line off"><span>تخفیف پلکانی</span><b>− ${money(q.discount)}</b></div>`
-                           :`<div class="line off"><span>تخفیف پلکانی</span><b>− ۰</b></div>`));
+        +offs.join('')
+        +(q.upgrade_off>0
+          ? `<div class="line note"><span>چون قبلاً ${Number(q.owned_count).toLocaleString('fa-IR')} رشته خریده‌اید،
+               فقط تفاوت قیمت پکیج کامل را می‌پردازید.</span></div>` : '');
 
       totalEl.innerHTML=money(q.payable)+' <span style="font-size:13px;font-weight:400">تومان</span>';
       if(q.discount>0){ wasEl.textContent=money(q.list_price)+' تومان'; wasEl.hidden=false; }

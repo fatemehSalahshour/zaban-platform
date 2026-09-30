@@ -39,11 +39,13 @@ class ZabanAdminReportController extends Controller
         $msgs = $ids->isEmpty() ? collect() : DB::table('report_messages')
             ->whereIn('report_id', $ids)->orderBy('id')->get()->groupBy('report_id');
 
-        /* نام کاربر و نام مستعار — ردیف پروفایل ممکن است هنوز ساخته نشده باشد. */
+        /* کاربر گزارش‌دهنده. موبایل هم می‌آید: حساب‌هایی که سرور احراز هویت
+           نامی برایشان نفرستاده، نامشان همان شماره است و بدون موبایل نمی‌شد
+           فهمید این «نام» است یا شماره. */
         $who = DB::table('users as u')
             ->leftJoin('zaban_profiles as p', 'p.user_id', '=', 'u.id')
             ->whereIn('u.id', $reports->getCollection()->pluck('user_id')->unique())
-            ->get(['u.id', 'u.name', 'p.nickname'])->keyBy('id');
+            ->get(['u.id', 'u.name', 'u.mobile', 'p.nickname', 'p.exam'])->keyBy('id');
 
         $counts = DB::table('reports')
             ->selectRaw('state, count(*) as c')->groupBy('state')->pluck('c', 'state');
@@ -56,6 +58,8 @@ class ZabanAdminReportController extends Controller
             'kind'    => $kind,
             'topics'  => ZabanReportController::TOPICS,
             'who'     => $who,
+            /* نام فارسی رشته → کد، برای ساختن نشانی تست در پلتفرم */
+            'examCode' => array_flip(\App\Services\ContentBuilder::EXAM_FA),
             'counts'  => [
                 'open'     => (int) ($counts['open'] ?? 0),
                 'answered' => (int) ($counts['answered'] ?? 0),

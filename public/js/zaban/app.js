@@ -262,6 +262,7 @@ function timeline(w){
 function actions(w){
   const d=deck.has(w.w),st=star.has(w.w);
   return `<div class="acts">
+    ${sayBtns(w.w,true)}
     <button class="star ${st?"on":""}" data-star="${w.w}" data-tip="${st?"حذف از منتخب‌ها":"افزودن به منتخب‌ها"}">${st?"★":"☆"}</button>
     <button class="add ${d?"in":""}" data-toggle="${w.w}" data-tip="${d?"حذف از دک مرور":"افزودن به دک مرور"}">${d?"✓":"+"}</button>
     ${nBtn("w:"+w.w,"یادداشت — "+w.w,"star")}
@@ -280,6 +281,7 @@ function render(){
         <div class="head">
           <span class="word en">${w.w}</span>
           <span class="pos en">${w.pos}</span>
+          ${predChip(w,true)}
           ${rangeChips(w)}
           <span class="badge ${lvlClass(w.lvl)}">${w.lvl}</span>
         </div>
@@ -396,7 +398,147 @@ bindRow("#list");
 bindRow("#starList");
 
 /* ---------------- صفحه‌ی کلمه ---------------- */
-function say(t){try{const u=new SpeechSynthesisUtterance(t);u.lang="en-US";u.rate=.85;speechSynthesis.speak(u)}catch(e){}}
+/* ---------------- تلفظ ----------------
+   دو لهجه: آمریکایی و بریتیش. صدا از خود دستگاه می‌آید (Web Speech)، پس
+   فایلی دانلود نمی‌شود و آفلاین هم کار می‌کند. فهرست صداها در بعضی
+   مرورگرها با تأخیر می‌آید، برای همین با voiceschanged دوباره خوانده
+   می‌شود؛ نسخه‌ی قبل فقط u.lang را ست می‌کرد و روی دستگاهی که چند صدای
+   انگلیسی دارد، لهجه‌ی خواسته‌شده تضمین نمی‌شد. */
+let VOICES=[], VOICES_READY=false;
+function loadVoices(){
+  try{ VOICES=speechSynthesis.getVoices()||[] }catch(e){ VOICES=[] }
+  if(!VOICES.length||VOICES_READY)return;
+  VOICES_READY=true;
+  /* فهرست صداها با تأخیر می‌آید. تا آن لحظه هر دو لهجه سالم فرض می‌شوند،
+     پس صفحه‌های باز باید یک بار دوباره ساخته شوند تا «؟» و خط‌چین سر جایشان
+     بنشینند. */
+  try{ if(currentWord && $("#detail") && $("#detail").classList.contains("open")) renderWord(currentWord) }catch(e){}
+  try{ refreshAll() }catch(e){}
+}
+loadVoices();
+try{ speechSynthesis.onvoiceschanged=loadVoices }catch(e){}
+
+/* آیا صدای دقیقاً همین لهجه روی دستگاه هست؟ */
+function hasVoice(lang){
+  const want=String(lang).toLowerCase();
+  return VOICES.some(v=>String(v.lang||"").toLowerCase().replace("_","-")===want);
+}
+
+function pickVoice(lang){
+  if(!VOICES.length)loadVoices();
+  const want=String(lang||"en-US").toLowerCase();
+  const norm=v=>String(v.lang||"").toLowerCase().replace("_","-");
+  return VOICES.find(v=>norm(v)===want)
+      || VOICES.find(v=>norm(v).startsWith(want.slice(0,2)) && /google|natural|premium/i.test(v.name||""))
+      || VOICES.find(v=>norm(v).startsWith(want.slice(0,2)))
+      || null;
+}
+let SAY_WARNED=false;
+function say(t,lang){
+  lang=lang||"en-US";
+  try{
+    speechSynthesis.cancel();                 /* تلفظ قبلی نصفه نماند */
+    const u=new SpeechSynthesisUtterance(String(t||""));
+    u.lang=lang; u.rate=.85;
+    const v=pickVoice(lang);
+    if(v)u.voice=v;
+    else if(!SAY_WARNED){
+      SAY_WARNED=true;
+      toast("صدای این لهجه روی دستگاه شما نصب نیست؛ نزدیک‌ترین صدای انگلیسی پخش شد. توضیح در صفحه‌ی کلمه.");
+    }
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* ---------------- امتیاز اهمیت ----------------
+   همان امتیازی که zaban:predict شبانه حساب می‌کند و در words.pred_score
+   می‌نشیند: تکرار کلمه در ۲۵ سال کنکور، با وزن بیشتر برای سال‌های اخیر،
+   به‌علاوه‌ی سررسید و پیوستگی. عددی بین ۰ تا ۹۷.
+
+   تا حالا فقط در تب «پیش‌بینی کنکور» دیده می‌شد. ولی وقتی کاربر زیر یک
+   تست بیست کلمه می‌بیند، مهم‌ترین سؤالش این است که از کدام شروع کند.
+
+   نکته: تب پیش‌بینی عدد خودش را با فیلترهای همان تب دوباره حساب می‌کند
+   (رشته، بخش، سطح، حالت امتیازدهی)، پس ممکن است با این عدد یکی نباشد.
+   این یکی امتیاز کلیِ کلمه در کل بانک است. */
+function predOf(word){
+  const w = typeof word === "string" ? WBYID[WID[word]] : word;
+  const p = w && w.pred;
+  return (p == null || isNaN(p)) ? null : +p;
+}
+function predChip(word, small){
+  const p = predOf(word);
+  if(p == null) return "";
+  const n = Math.round(p);
+  const cls = n >= 70 ? "hi" : n >= 40 ? "mid" : "lo";
+  return `<span class="pchip ${cls}${small?" sm":""}" dir="ltr"
+    data-tip="امتیاز اهمیت: ${fa(n)} از ۱۰۰<br>از تکرار این کلمه در ۲۵ سال کنکور، با وزن بیشتر برای سال‌های اخیر">${fa(n)}</span>`;
+}
+/* مهم‌ترین‌ها بالا. کلمه‌ی بدون امتیاز (تازه وارد شده و predict هنوز
+   رویش نرفته) ته فهرست می‌رود، نه اول. */
+function byPred(list){
+  return [...(list||[])].sort((a,b)=>{
+    const pa=predOf(a.w), pb=predOf(b.w);
+    return (pb==null?-1:pb)-(pa==null?-1:pa) || String(a.w).localeCompare(String(b.w));
+  });
+}
+
+/* دکمه‌های تلفظ — همه‌جا یک شکل: کنار کلمه در فهرست، در صفحه‌ی کلمه،
+   روی کارت مرور و در فهرست کلمات یک تست. */
+function sayBtns(word,small){
+  const w=String(word||"").replace(/"/g,"&quot;");
+  if(!w)return "";
+  /* اگر صدای یک لهجه روی دستگاه نصب نباشد، همان دکمه خط‌چین می‌شود و یک
+     «؟» کنارش می‌آید. این توضیح باید هر جا دکمه‌ی صدا هست در دسترس باشد،
+     نه فقط در صفحه‌ی کلمه — وگرنه کاربر فکر می‌کند دکمه‌ها خراب‌اند. */
+  const us=!VOICES_READY||hasVoice("en-us"), uk=!VOICES_READY||hasVoice("en-gb");
+  const help=(us&&uk)?"":`<button class="speak qmark" data-sayhelp="1"
+      data-tip="چرا هر دو دکمه یک‌جور شنیده می‌شوند؟" aria-label="راهنمای تلفظ">؟</button>`;
+  return `<span class="say${small?" sm":""}">
+    <button class="speak${us?"":" miss"}" data-say="${w}" data-lang="en-US" data-tip="تلفظ آمریکایی" aria-label="تلفظ آمریکایی ${w}">US</button>
+    <button class="speak${uk?"":" miss"}" data-say="${w}" data-lang="en-GB" data-tip="تلفظ بریتیش" aria-label="تلفظ بریتیش ${w}">UK</button>
+    ${help}
+  </span>`;
+}
+
+/* یادداشت زیر دکمه‌های تلفظ — فقط وقتی واقعاً لازم است.
+   صدا از خود دستگاه می‌آید، پس اگر کاربر صدای بریتیش نداشته باشد هر دو
+   دکمه یک‌جور شنیده می‌شوند. بدون توضیح، این شبیه باگ پلتفرم به نظر
+   می‌رسد؛ با توضیح، کاربر می‌داند چه کاری از دستش برمی‌آید. */
+function sayNote(){
+  if(!VOICES_READY)return "";                       /* هنوز فهرست صداها نیامده */
+  const us=hasVoice("en-us"), uk=hasVoice("en-gb");
+  if(us&&uk)return "";
+  const miss = !us&&!uk ? "صدای انگلیسی" : (uk ? "صدای آمریکایی" : "صدای بریتیش");
+  return `<div class="capt saynote">${miss} روی این دستگاه نصب نیست، پس هر دو دکمه
+    نزدیک‌ترین صدای موجود را پخش می‌کنند.
+    <button class="qsthelp" data-sayhelp="1">چطور نصبش کنم؟</button></div>`;
+}
+function sayHelp(){
+  askInfo("تلفظ آمریکایی و بریتیش", `
+    <p class="capt" style="margin:0 0 12px">تلفظ با صدای خود دستگاه شما پخش می‌شود — نه فایل صوتی
+      دانلودی. مزیتش این است که آفلاین هم کار می‌کند و اینترنت نمی‌خواهد؛ عیبش این است که اگر
+      دستگاه شما فقط یک صدای انگلیسی داشته باشد، هر دو دکمه یک‌جور شنیده می‌شوند.</p>
+    <p class="capt" style="margin:0 0 6px"><b>ویندوز</b><br>
+      Settings ← Time &amp; language ← Language &amp; region ← Add a language ←
+      «English (United Kingdom)» و هنگام نصب تیک Speech را بزنید. بعد مرورگر را ببندید و باز کنید.</p>
+    <p class="capt" style="margin:0 0 6px"><b>اندروید</b><br>
+      تنظیمات ← مدیریت کلی یا System ← Text-to-speech ← موتور Google ← نصب داده‌ی صدا ←
+      انگلیسی (بریتانیا).</p>
+    <p class="capt" style="margin:0 0 6px"><b>آیفون و آیپد</b><br>
+      Settings ← Accessibility ← Spoken Content ← Voices ← English ← British English را دانلود کنید.</p>
+    <p class="capt" style="margin:12px 0 0">روی کروم دسکتاپ معمولاً هر دو صدا از قبل هست و کاری لازم نیست.</p>`);
+}
+
+/* در مرحله‌ی capture: ردیف‌ها و کارت‌ها خودشان کلیک را می‌گیرند و صفحه‌ی
+   کلمه را باز می‌کنند؛ این باید زودتر جلویشان را بگیرد. */
+document.addEventListener("click",e=>{
+  if(e.target.closest("[data-sayhelp]")){ e.preventDefault(); e.stopPropagation(); sayHelp(); return }
+  const b=e.target.closest("[data-say]");
+  if(!b)return;
+  e.preventDefault(); e.stopPropagation();
+  say(b.dataset.say, b.dataset.lang);
+},true);
 function stem(s){return s.replace(/(ations?|ment|ness|ously|ity|ing|ed|ly|s)$/,"").slice(0,6)}
 function kin(w){return WORDS.filter(x=>x!==w&&stem(x.w)===stem(w.w)).slice(0,8)}
 
@@ -553,11 +695,13 @@ function renderWord(w){
    <header>
      <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px;flex-wrap:wrap">
        <span class="en" style="font-size:26px;font-weight:700">${w.w}</span>
-       <button class="speak" data-say="${w.w}" aria-label="تلفظ">🔊</button>
+       ${sayBtns(w.w)}
      </div>
+     ${sayNote()}
      <div class="kin" style="gap:6px">
        <span class="badge b-once en">${w.pos}</span>
        <span class="badge ${lvlClass(w.lvl)}">${w.lvl}</span>
+       ${predChip(w)}
        ${wChips([...new Set(w.occ.map(o=>o[0]))].sort((a,b)=>a-b), YEARS.length, w.occ.length, w.ally)}
      </div>
      <div class="row-f" style="margin-top:12px">
@@ -1149,6 +1293,9 @@ function renderQuestion(y,e,q){
          data-tip="${rAnswered("q:"+qk)?"به گزارش شما پاسخ داده شده":(rHas("q:"+qk)?"گزارش شما در انتظار پاسخ است":"گزارش اشکال این تست")}">⚑ ${rAnswered("q:"+qk)?"پاسخ داده شد":(rHas("q:"+qk)?"ثبت شده":"گزارش")}</button>`}
      </div>
      ${nBox("q:"+qk)}</header>
+   ${rev&&!exQ?`<div class="row-f qbacktop">
+       <button class="ghost" data-qrev="0">← بازگشت به صورت سؤال</button>
+     </div>`:""}
    <section class="qcard ${rev?"rev":""}">${body}
      ${exQ?`${optsHTML({q,Q},true)}${qTools({q,Q},true)}${rev?answerBox({q,Q,y,e}):""}`:`
      <div class="ex-os ${Q.view===12?"c1":Q.view===6?"c2":"c4"} big">${ordered.map((o,i)=>{
@@ -1163,7 +1310,6 @@ function renderQuestion(y,e,q){
         picked===ans?"پاسخ شما درست بود":"پاسخ شما غلط بود"}</div>`:""}
      ${rev
        ? `<div class="row-f" style="margin:0 0 12px">
-            <button class="ghost" data-qrev="0">← بازگشت به صورت سؤال</button>
             <button class="ghost" data-qstats="1">${curView&&curView.stats?"بستن آمار":"آمار این تست"}</button>
             ${picked!=null?`<button class="ghost" data-qretry="1" style="margin-right:auto">دوباره زدن این تست</button>`:""}
           </div>
@@ -1832,9 +1978,11 @@ function faceHTML(c,back){
     if(!back){
       return mode==="fa"
         ? `<div>${cardActions(c)}<div class="rev" style="font-size:24px;margin-top:6px">${w.fa}</div><div class="hint">معادل انگلیسی را به یاد بیاورید</div></div>`
-        : `<div>${cardActions(c)}<div class="big en" style="margin-top:6px">${w.w}</div><div style="margin-top:8px"><span class="badge b-freq">${fa(w.freq)} سال در کنکور</span></div></div>`;
+        : `<div>${cardActions(c)}<div class="big en" style="margin-top:6px">${w.w}</div>
+           <div style="margin-top:8px">${sayBtns(w.w,true)}<span class="badge b-freq">${fa(w.freq)} سال در کنکور</span></div></div>`;
     }
     return `<div>${cardActions(c)}<div class="big en" style="font-size:23px;margin-top:6px">${w.w}</div>
+      <div style="margin-top:4px">${sayBtns(w.w,true)}</div>
       <div class="rev" style="margin-top:6px">${w.fa}</div>
       <div style="font-size:12px;color:var(--ink-3)">${w.pos}${w.forms?" · "+w.forms.join(" / "):""}</div>
       ${(()=>{ const ex=examplesOf(w,()=>{if(session[pos]===c)paintCard()});
@@ -1878,7 +2026,7 @@ function faceHTML(c,back){
     <div class="ansbox"><b>پاسخ درست: گزینه‌ی ${fa(Q.ans+1)} — ${Q.opts[Q.ans].w}</b>
       <div>${Q.opts[Q.ans].fa}</div>${Q.stemFa?`<div>${Q.stemFa}</div>`:""}</div>
     <div class="label" style="margin-top:12px;text-align:right">کلمات این سؤال</div>
-    ${Q.ws.map(x=>`<div class="wline" data-w="${x.w}"><b class="en">${x.w}</b><span>${x.fa}</span></div>`).join("")}</div>`;
+    ${byPred(Q.ws).map(x=>`<div class="wline" data-w="${x.w}"><b class="en">${x.w}</b>${predChip(x.w,true)}${sayBtns(x.w,true)}<span>${x.fa}</span></div>`).join("")}</div>`;
 }
 function paintCard(){
   const rate=$("#rRate"),opts=$("#rOpts"),show=$("#rShow");
@@ -3149,7 +3297,12 @@ function optsHTML(it,big){
   /* view از پلتفرم آزمون می‌آید: ۳ = چهار گزینه در یک ردیف،
    ۶ = دو تایی، ۱۲ = هر گزینه یک ردیف کامل. */
   const cols = Q.view===12 ? "c1" : Q.view===6 ? "c2" : "c4";
-  return `<div class="ex-os ${cols}${big?" big":""}">${Q.opts.map((o,i)=>{
+  /* طول بلندترین گزینه تعیین می‌کند چند تا در یک ردیف جا می‌شوند.
+     بدون این، چیدمان خودکار گاهی سه گزینه را در ردیف اول می‌گذاشت و
+     چهارمی تنها می‌افتاد زیرشان — هم زشت بود هم ترتیب را گم می‌کرد. */
+  const wid = Math.max(...Q.opts.map(o => String(o.w || "").trim().length), 0);
+  const len = wid > 26 ? " xlong" : wid > 13 ? " long" : "";
+  return `<div class="ex-os ${cols}${len}${big?" big":""}">${Q.opts.map((o,i)=>{
 
     let c=a===i?"sel":"";
     if(out[i])c+=" out";
@@ -3176,13 +3329,14 @@ function allWordsOf(Q){
   return out;
 }
 function wordChips(list, title, opts){
-  list = (list||[]).filter(Boolean);
+  list = byPred((list||[]).filter(Boolean));   /* مهم‌ترین‌ها بالا */
   if(!list.length)return "";
   const o = opts||{};
   const inAll = list.every(w=>deck.has(w.w));
   const body = `<div class="ex-ws">${list.map(w=>`<button data-w="${w.w}" class="${deck.has(w.w)?"in":""}"
         data-tip="برای دیدن کارت کامل «${w.w}» بزنید">
         <bdi class="en">${w.w}</bdi>
+        ${predChip(w.w,true)}
         <span class="fa">${cleanFa(w.fa)||"—"}</span>
         ${deck.has(w.w)?'<i class="dk">در دک</i>':""}
       </button>`).join("")}</div>`;

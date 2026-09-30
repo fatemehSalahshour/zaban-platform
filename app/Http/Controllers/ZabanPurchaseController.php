@@ -102,6 +102,11 @@ class ZabanPurchaseController extends Controller
             return back()->withInput()->with('buy_error', $e->getMessage());
         }
 
+        /* سفارش بی‌پرداخت (اعتبار خرید قبلی کل مبلغ را پوشانده): مستقیم نتیجه */
+        if (!empty($r['free'])) {
+            return redirect()->route('buy.result', ['order' => $r['order_id']]);
+        }
+
         /* درگاه فقط POST با فیلد tokenIdentity می‌پذیرد — فرم خودکار */
         return view('buy.redirect', ['url' => $r['pay_url'], 'token' => $r['token']]);
     }

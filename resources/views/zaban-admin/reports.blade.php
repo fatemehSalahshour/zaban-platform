@@ -7,6 +7,26 @@
       $p = explode('|', substr($k, 2)) + ['', '', ''];
       return "سؤال {$p[2]} — کنکور {$p[0]} {$p[1]}";
   };
+
+  /* نشانی همان کلمه یا تست در خود پلتفرم — مدیر باید بتواند در یک کلیک
+     ببیند کاربر دقیقاً از چه چیزی حرف می‌زند، نه اینکه دستی دنبالش بگردد. */
+  $link = function (string $k) use ($examCode): ?string {
+      if (str_starts_with($k, 'w:')) return url('/zaban/word/' . rawurlencode(substr($k, 2)));
+      $p = explode('|', substr($k, 2)) + ['', '', ''];
+      $code = $examCode[$p[1]] ?? null;
+      return ($code && $p[0] && $p[2]) ? url("/zaban/test/{$p[0]}/{$code}/{$p[2]}") : null;
+  };
+
+  /* راه رفع هر موضوع. بدون این، مدیر گزارش را می‌خواند و نمی‌داند از کجا
+     شروع کند؛ مسیر اصلاح هر کدام واقعاً فرق می‌کند. */
+  $howto = [
+    'معنی نادرست' => 'معنی‌ها از ستون Persian Meaning همان ردیف در sheet1.csv می‌آیند. ردیف را اصلاح کنید و ایمپورت را دوباره بزنید. چون ایمپورت معنی‌ها را ادغام می‌کند، معنی غلط قبلی خودش پاک نمی‌شود و باید دستی حذفش کنید.',
+    'اشتباه نگارشی' => 'اگر در معنی فارسی است، همان ردیف sheet1.csv؛ اگر در متن سؤال یا گزینه است، داده از پلتفرم آزمون می‌آید و با zaban:sync-questions به‌روز می‌شود.',
+    'این کلمه در این تست نیست' => 'پیوند کلمه به تست، یک «ظهور» است. در «کلمه‌ها و ظهورها» همان کلمه را باز کنید و ظهور اشتباه را حذف کنید.',
+    'گزینه اشتباه' => 'گزینه‌ها و کلید پاسخ از پلتفرم آزمون می‌آیند. اول همان‌جا اصلاح کنید، بعد zaban:sync-questions بزنید.',
+    'فاقد جواب تشریحی' => 'پاسخ تشریحی از ستون explanation پلتفرم آزمون می‌آید. آنجا بنویسید و zaban:sync-questions بزنید.',
+    'اشتباه علمی' => 'بسته به اینکه ایراد در معنی است یا در خود سؤال: معنی از sheet1.csv و سؤال از پلتفرم آزمون.',
+  ];
   $tabs = ['open' => 'در انتظار پاسخ', 'answered' => 'پاسخ داده شده', 'all' => 'همه'];
 @endphp
 
@@ -47,15 +67,34 @@
 @forelse ($reports as $r)
   @php $u = $who[$r->user_id] ?? null; @endphp
   <div class="panel rep {{ $r->state === 'open' ? 'is-open' : '' }}">
+    @php $href = $link($r->item_key); @endphp
     <div class="rep-h">
-      <b>{{ $label($r->item_key) }}</b>
+      @if ($href)
+        <b><a href="{{ $href }}" target="_blank" rel="noopener">{{ $label($r->item_key) }} ↗</a></b>
+      @else
+        <b>{{ $label($r->item_key) }}</b>
+      @endif
       <span class="tag">{{ $r->topic }}</span>
       <span class="tag {{ $r->state === 'open' ? 'wait' : 'gold' }}">
         {{ $r->state === 'open' ? 'در انتظار پاسخ' : 'پاسخ داده شده' }}</span>
       <span class="who">
-        {{ $u->name ?? 'کاربر حذف‌شده' }}@if ($u && $u->nickname) ({{ $u->nickname }})@endif
-        · شماره‌ی {{ $r->user_id }}
+        @if ($u)
+          <a href="{{ route('zadmin.users', ['q' => $u->name]) }}">{{ $u->name }}</a>@if ($u->nickname) ({{ $u->nickname }})@endif
+          @if ($u->mobile && $u->mobile !== $u->name) · {{ $u->mobile }}@endif
+          · کاربر #{{ $r->user_id }}
+        @else
+          کاربر حذف‌شده · #{{ $r->user_id }}
+        @endif
       </span>
+    </div>
+
+    <div class="rep-fix">
+      @if (str_starts_with($r->item_key, 'w:'))
+        <a href="{{ route('zadmin.words', ['q' => substr($r->item_key, 2)]) }}">کلمه و ظهورهایش در پنل</a>
+      @endif
+      @if (!empty($howto[$r->topic]))
+        <span>{{ $howto[$r->topic] }}</span>
+      @endif
     </div>
 
     <div class="thread">
@@ -109,6 +148,14 @@
   .rep-h b{color:var(--ink);font-size:14.5px}
   .tag.wait{background:#fdf0eb;border-color:#f0cdbe;color:var(--danger)}
   .who{width:100%;font-size:12px;color:var(--ink-3)}
+  .who a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+  .rep-h b a{color:inherit;text-decoration:none}
+  .rep-h b a:hover{text-decoration:underline;text-underline-offset:3px}
+  /* راه رفع — جعبه‌ی آرام بالای گفتگو، برای مدیر نه کاربر */
+  .rep-fix{background:var(--surface);border:1px solid var(--line);border-radius:9px;
+    padding:9px 12px;margin:0 0 12px;font-size:12px;line-height:2;color:var(--ink-2)}
+  .rep-fix a{color:var(--gold);font-weight:500;margin-inline-end:8px;white-space:nowrap}
+  .rep-fix:empty{display:none}
   .thread{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
   .msg{padding:8px 12px;border-radius:9px;max-width:88%}
   .msg.user{background:var(--surface);align-self:flex-start}

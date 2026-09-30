@@ -86,7 +86,7 @@
       <div class="mean" id="mean"></div>
       <div class="ribbon">
         <div class="ribbon-cells" id="ribbon" aria-hidden="true"></div>
-        <div class="ribbon-axis"><span>{{ \App\Support\FaNum::format($facts['y1']) }}</span><span>{{ \App\Support\FaNum::format((int) (($facts['y1'] + $facts['y2']) / 2)) }}</span><span>{{ \App\Support\FaNum::format($facts['y2']) }}</span></div>
+        <div class="ribbon-axis"><span>{{ \App\Support\FaNum::digits($facts['y1']) }}</span><span>{{ \App\Support\FaNum::digits((int) (($facts['y1'] + $facts['y2']) / 2)) }}</span><span>{{ \App\Support\FaNum::format($facts['y2']) }}</span></div>
       </div>
       <div class="plate-foot">
         <span>در <b id="yrs">۰</b> کنکور از {{ \App\Support\FaNum::format($facts['years']) }} آمده</span>
@@ -102,11 +102,13 @@
   /* اگر بانک خالی باشد (نصب تازه) عددها صفر می‌شوند و جمله بی‌معنا؛ در آن
      حالت همان متن عمومی بدون عدد نشان داده می‌شود. */
   $fa = fn ($n) => \App\Support\FaNum::format((int) $n);
+  /* سال جداکننده‌ی هزار نمی‌گیرد: «۱۳۸۱»، نه «۱٬۳۸۱» */
+  $yr = fn ($n) => \App\Support\FaNum::digits((int) $n);
 @endphp
 <div class="ledger">
   <div class="wrap">
     <div><b>{{ $fa($facts['booklets']) }}</b><span>دفترچه‌ی کنکور زبان، از {{ $fa($facts['exams']) }} رشته</span></div>
-    <div><b>{{ $fa($facts['years']) }}</b><span>سال پیاپی@if ($facts['y1'] && $facts['y2'])، از {{ $fa($facts['y1']) }} تا {{ $fa($facts['y2']) }}@endif</span></div>
+    <div><b>{{ $fa($facts['years']) }}</b><span>سال پیاپی@if ($facts['y1'] && $facts['y2'])، از {{ $yr($facts['y1']) }} تا {{ $yr($facts['y2']) }}@endif</span></div>
     <div><b>{{ $fa($facts['sections']) }}</b><span>بخش آزمون: وکب، کلوز تست، پسیج</span></div>
     <div><b>۴</b><span>حالت مرور: دو جهت کلمه، تست‌ها، همه با هم</span></div>
   </div>
@@ -156,7 +158,7 @@
         <p>این همان کارتی است که هر روز داخل پلتفرم می‌بینی. معنی را در ذهنت بگو، بعد پاسخ را ببین و یکی از چهار دکمه را بزن.</p>
         <ul>
           <li>دو جهت مرور: انگلیسی به فارسی، و فارسی به انگلیسی برای وقتی که باید کلمه را خودت پیدا کنی.</li>
-          <li>زیر هر دکمه نوشته این کلمه کِی برمی‌گردد. کلمه‌ای که بلدی کمتر وقتت را می‌گیرد، کلمه‌ای که نبلدی زودتر برمی‌گردد.</li>
+          <li>زیر هر دکمه نوشته این کلمه کِی برمی‌گردد. کلمه‌ای که بلدی کمتر وقتت را می‌گیرد، کلمه‌ای که بلد نیستی زودتر برمی‌گردد.</li>
           <li>کلمه‌ای که بیش از دو بار «یادم نبود» خورده، در فیدبک و تسلط جدا نشانت داده می‌شود.</li>
         </ul>
       </div>
@@ -377,7 +379,8 @@
 <section class="final night">
   <div class="wrap">
     <h2>صبح کنکور، دفترچه را باز می‌کنی و کلمه‌ها را می‌شناسی.</h2>
-    <p>این حس اتفاقی نیست. نتیجه‌ی چند دقیقه در روز است، از همین امروز تا آن صبح.</p>
+    {{-- «آن صبح» با فاصله‌ی سخت، وگرنه «صبح» تنها به خط بعد می‌افتد --}}
+    <p>این حس اتفاقی نیست. نتیجه‌ی چند دقیقه در روز است، از همین امروز تا آن&nbsp;صبح.</p>
     <div class="countdown"><b id="finalDays">—</b><span>روز تا کنکور ارشد ۱۴۰۶</span></div>
     <div><a class="btn btn-foil" href="{{ route('login') }}">شروع مرور کلمات</a></div>
   </div>

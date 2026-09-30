@@ -473,7 +473,20 @@ html[data-theme="dim"] .dashbtn.on,html[data-theme="dark"] .dashbtn.on{
 .sheet header{padding:20px 20px 15px;border-bottom:1px solid var(--line)}
 .sheet section{padding:14px 20px;border-bottom:1px solid var(--line)}
 .sheet section:last-child{border-bottom:none}
-.speak{border:1px solid var(--line-2);border-radius:8px;width:30px;height:30px;font-size:14px;color:var(--ink-2)}
+/* تلفظ: دو دکمه‌ی چسبیده، آمریکایی و بریتیش. برچسب متنی به‌جای آیکن
+   بلندگو، چون کاربر باید بداند کدام لهجه را می‌شنود. */
+.say{display:inline-flex;align-items:center;gap:0;vertical-align:middle;flex:none}
+.say::before{content:"🔊";font-size:12px;opacity:.6;margin-inline-end:5px;line-height:1}
+.speak{border:1px solid var(--line-2);color:var(--ink-2);font-size:11px;font-weight:600;
+  letter-spacing:.03em;padding:0 8px;height:26px;line-height:1;font-family:inherit}
+.speak:first-of-type{border-radius:0 8px 8px 0;border-inline-end:none}
+.speak:last-of-type{border-radius:8px 0 0 8px}
+.speak:hover{border-color:var(--gold);color:var(--gold);z-index:1}
+.speak:active{background:var(--gold-soft)}
+.say.sm::before{font-size:11px;margin-inline-end:4px}
+.say.sm .speak{height:23px;padding:0 6px;font-size:10px}
+/* روی کارت مرور و ردیف‌های فشرده، آرام‌تر تا با دکمه‌های اصلی رقابت نکند */
+.acts .say .speak,.wline .say .speak{color:var(--ink-3)}
 .forms{display:flex;gap:8px}
 .forms div{flex:1;background:var(--canvas);border-radius:var(--r);padding:8px;text-align:center}
 .forms .k{font-size:11px;color:var(--ink-3)}
@@ -677,10 +690,22 @@ html[data-theme="dim"] .dashbtn.on,html[data-theme="dark"] .dashbtn.on{
 /* تعداد ستون از عرض خود جعبه، نه عرض پنجره: همین گزینه‌ها هم در دفترچه‌ی
    پهن آزمون می‌آیند هم در پنجره‌ی باریک سؤال. با repeat(4,1fr) در پنجره‌ی
    باریک هر ستون چند پیکسل می‌شد و کلمه حرف‌به‌حرف می‌شکست. */
-.ex-os.c2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.ex-os.c4{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-@media(max-width:900px){.ex-os.c4{grid-template-columns:1fr 1fr}}
-@media(max-width:600px){.ex-os.c4,.ex-os.c2{grid-template-columns:1fr}}
+/* تعداد ستون‌ها همیشه ۴، ۲ یا ۱ است — هیچ‌وقت ۳.
+   با چیدمان خودکار (auto-fit) در عرض‌های میانی سه گزینه در ردیف اول جا
+   می‌شد و چهارمی تنها زیرشان می‌افتاد؛ هم زشت بود هم ترتیب ۱ تا ۴ را گم
+   می‌کرد. ملاک هم عرضِ «جعبه‌ی سؤال» است نه عرض پنجره، چون همین گزینه‌ها
+   هم در دفترچه‌ی پهن می‌آیند و هم در پنجره‌ی باریک یک تست.
+   long / xlong را خود app.js از طول بلندترین گزینه می‌گذارد. */
+.ex-q{container-type:inline-size}   /* روی .qcard نه: کارت مرور سه‌بعدی می‌چرخد */
+.ex-os.c2, .ex-os.c4{grid-template-columns:1fr 1fr}   /* مرورگر بدون @container */
+@container (max-width:560px){ .ex-os.c2, .ex-os.c4{grid-template-columns:1fr} }
+@container (min-width:900px){ .ex-os.c4{grid-template-columns:repeat(4,1fr)} }
+/* گزینه‌های بلند: حداکثر دو ستون، و خیلی بلند: هر کدام یک ردیف کامل */
+@container (min-width:900px){ .ex-os.c4.long{grid-template-columns:1fr 1fr} }
+.ex-os.xlong{grid-template-columns:1fr}
+@container (min-width:900px){ .ex-os.c4.xlong{grid-template-columns:1fr} }
+/* کف ثابت برای پنجره‌ی باریک — پنجره‌ی یک تست container ندارد */
+@media(max-width:600px){ .ex-os.c2, .ex-os.c4{grid-template-columns:1fr} }
  
 .ex-o{display:flex;align-items:center;gap:8px;padding:6px 4px;min-width:0}
 .ex-o .box{display:flex;align-items:center;gap:7px;cursor:pointer;flex:1;min-width:0}
@@ -1523,6 +1548,9 @@ html[data-theme="dark"] .actionbar,html[data-theme="dim"] .actionbar{background:
 #detail.scrim,#qview.scrim,#review.scrim,#cbM.scrim{z-index:10050 !important}
 #noteM.scrim,#repM.scrim,#admM.scrim{z-index:10060 !important}
 #askM.scrim{z-index:10070 !important}
+/* پنجره‌ی راهنما از همه بالاتر: از داخل صفحه‌ی کلمه باز می‌شود، پس اگر
+   هم‌ترازِ آن بماند زیرش می‌افتد و کاربر فکر می‌کند دکمه کار نمی‌کند. */
+#infoM.scrim{z-index:10080 !important}
 #toast.toast{z-index:10080 !important}
 #tipbox{z-index:10090 !important}
 
@@ -1674,3 +1702,28 @@ html[data-theme="dim"] .qhstrip i.bad,html[data-theme="dark"] .qhstrip i.bad{bac
 .qsthelp-t td{padding:7px 0;border-top:1px solid var(--line);vertical-align:top;line-height:1.95}
 .qsthelp-t tr:first-child td{border-top:none}
 .qsthelp-t td:first-child{width:130px;padding-left:10px;white-space:nowrap}
+
+/* یادداشت لهجه — فقط وقتی صدای آن لهجه روی دستگاه نصب نیست */
+.saynote{margin:-2px 0 8px;line-height:1.9}
+.saynote .qsthelp{margin-right:4px}
+
+/* امتیاز اهمیت کلمه — همان عدد تب پیش‌بینی، کنار خود کلمه */
+.pchip{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:21px;
+  padding:0 6px;border-radius:20px;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;
+  border:1px solid transparent;cursor:help;flex:none}
+.pchip.hi{background:#f6e3d8;border-color:#e8c4b0;color:#8d3617}
+.pchip.mid{background:var(--gold-soft);border-color:var(--gold-line);color:#7d6320}
+.pchip.lo{background:var(--canvas);border-color:var(--line);color:var(--ink-3)}
+.pchip.sm{min-width:25px;height:19px;font-size:10px;padding:0 5px}
+html[data-theme="dim"] .pchip.hi,html[data-theme="dark"] .pchip.hi{background:#3a221b;border-color:#5c3527;color:#e6a88f}
+
+/* «؟» کنار دکمه‌های تلفظ — فقط وقتی صدای یکی از دو لهجه روی دستگاه نیست */
+.speak.qmark{border-radius:8px;border-inline-start:1px solid var(--line-2);margin-inline-start:5px;
+  font-size:11px;color:var(--ink-3);padding:0 7px}
+.speak.qmark:hover{border-color:var(--gold);color:var(--gold)}
+/* لهجه‌ای که صدایش نصب نیست: خط‌چین، تا کاربر بداند کدام‌یک واقعی نیست */
+.speak.miss{border-style:dashed;opacity:.72}
+
+/* «بازگشت به صورت سؤال» بالای کارت — هم‌جای دکمه‌ی بازگشت بقیه‌ی صفحه‌ها،
+   نه ته صفحه که کاربر باید دنبالش بگردد */
+.qbacktop{margin:0 0 10px}
