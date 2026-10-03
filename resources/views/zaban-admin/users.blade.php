@@ -4,27 +4,27 @@
 @section('body')
 <div class="head">
   <h2>کاربران و دسترسی‌ها</h2>
-  <p>صد کاربر آخر. برای پیدا کردن یک نفر، نام یا ایمیلش را بنویسید.</p>
+  <p>صد کاربر آخر. برای پیدا کردن یک نفر، نام، موبایل، شناسه، نام مستعار یا دانشگاهش را بنویسید.</p>
 </div>
 
 <div class="panel">
   <form method="get" class="search">
-    <input type="search" name="q" value="{{ $q }}" placeholder="نام، ایمیل یا نام مستعار">
+    <input type="search" name="q" value="{{ $q }}" placeholder="نام، موبایل، شناسه یا نام مستعار">
     <button class="btn ghost" type="submit">جست‌وجو</button>
   </form>
 
   @if (count($users))
     <table>
       <thead>
-        <tr><th>#</th><th>نام</th><th>ایمیل</th><th>نقش</th>
+        <tr><th>#</th><th>نام</th><th>موبایل</th><th>نقش</th>
             <th>نام مستعار</th><th>رشته‌های فعال</th><th></th></tr>
       </thead>
       <tbody>
         @foreach ($users as $u)
           <tr>
             <td class="num">{{ $u->id }}</td>
-            <td>{{ $u->name }}</td>
-            <td class="num">{{ $u->email }}</td>
+            <td><a href="{{ route('zadmin.user', $u->id) }}">{{ $u->name }}</a></td>
+            <td class="num">{{ $u->mobile ?: '—' }}</td>
             <td>
               @if (in_array($u->type ?? 'student', ['admin','manager','editor']))
                 <span class="tag gold">{{ $u->type }}</span>
@@ -40,7 +40,8 @@
                 <span style="color:var(--ink-3)">—</span>
               @endforelse
             </td>
-            <td>
+            <td class="row-acts">
+              <a class="btn ghost" href="{{ route('zadmin.user', $u->id) }}">ویرایش</a>
               @if ($u->id !== auth()->id())
                 <form method="post" action="{{ route('impersonate.start', $u->id) }}" class="inline-form">
                   @csrf
@@ -56,6 +57,11 @@
     <div class="empty">کاربری با این جست‌وجو پیدا نشد.</div>
   @endif
 </div>
+
+<style>
+  .row-acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .row-acts .inline-form{margin:0}
+</style>
 
 @if (session('error'))
   <div class="panel" style="border-color:#b91c1c;color:#b91c1c">{{ session('error') }}</div>

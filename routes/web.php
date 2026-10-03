@@ -124,6 +124,11 @@ Route::middleware(['auth', 'zaban.admin'])
         Route::post('/settings', [ZabanAdminController::class, 'saveSettings'])->name('settings.save');
 
         Route::get('/users', [ZabanAdminController::class, 'users'])->name('users');
+        /* پرونده‌ی یک کاربر: اطلاعات، نقش و دسترسی رشته‌ها */
+        Route::get('/users/{id}', [ZabanAdminController::class, 'user'])
+            ->whereNumber('id')->name('user');
+        Route::put('/users/{id}', [ZabanAdminController::class, 'userSave'])
+            ->whereNumber('id')->name('user.save');
 
         /* اصلاح پیوند کلمه به سؤال — ظهور اشتباهی که از اکسل آمده */
         Route::get('/words', [\App\Http\Controllers\ZabanAdminWordsController::class, 'index'])

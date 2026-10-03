@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Services\ContentBuilder;
+use App\Services\Entitlements;
 use App\Services\Pricing;
+use Illuminate\Validation\Rule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -189,22 +191,19 @@ class ZabanAdminController extends Controller
 
         $pricing->saveBundles([1 => $data['p1'], 2 => $data['p2'], 3 => $data['p3']]);
 
-        /* تخفیف رونمایی. تاریخ‌ها شمسی نوشته و میلادی ذخیره می‌شوند؛ اگر خام
-           بمانند، مقایسه‌ی بازه سال ۱۴۰۶ میلادی می‌شود و تخفیف هیچ‌وقت فعال
-           نمی‌شود.
-
-           نکته‌ای که قبلاً باگ بود: Jalali::parseToGregorian وقتی ساعت ننوشته
-           باشید، پایان روز (۲۳:۵۹:۵۹) می‌دهد. برای «تا تاریخ» درست است، ولی
-           برای «از تاریخ» یعنی تخفیفی که امروز شروعش را گذاشته‌اید تا نیمه‌شب
-           روشن نمی‌شود — و مدیر مجبور بود یک روز عقب‌تر بنویسد. حالا تاریخِ
-           بدون ساعت برای «از» ابتدای روز و برای «تا» پایان روز می‌شود.
-           اگر خود مدیر ساعت بنویسد، همان ساعت می‌ماند. */
+        /* تخفیف رونمایی. تاریخ‌ها مثل exam_date شمسی نوشته و میلادی ذخیره
+           می‌شوند؛ اگر خام بمانند، مقایسه‌ی بازه سال ۱۴۰۶ میلادی می‌شود و
+           تخفیف هیچ‌وقت فعال نمی‌شود. «تا» به پایان همان روز کشیده می‌شود
+           وگرنه روز آخر از نیمه‌شب می‌پرد. */
         $jal = function (?string $v, bool $endOfDay = false): ?string {
             $v = trim((string) $v);
             if ($v === '') return null;
             $g = \App\Support\Jalali::parseToGregorian($v) ?: null;
             if (!$g) return null;
-            $hasTime = (bool) preg_match('~\d{1,2}:\d{2}~', $v);   /* ساعت را مدیر نوشته؟ */
+            /* تاریخِ بدون ساعت: برای «از» ابتدای روز، برای «تا» پایان روز.
+               قبلاً هر دو پایان روز می‌شدند، پس تخفیفی که شروعش امروز بود تا
+               نیمه‌شب روشن نمی‌شد و مدیر مجبور بود یک روز عقب‌تر بنویسد. */
+            $hasTime = (bool) preg_match('~\d{1,2}:\d{2}~', $v);
             if ($hasTime) return $g;
             return substr($g, 0, 10) . ($endOfDay ? ' 23:59:59' : ' 00:00:00');
         };
@@ -259,17 +258,24 @@ class ZabanAdminController extends Controller
     public function users(Request $req): View
     {
         $q = trim((string) $req->query('q', ''));
+        /* جست‌وجوی موبایل: کاربر را با شماره می‌شناسیم (ورود با همان است) و
+           رقم فارسی هم باید بگیرد، چون مدیر معمولاً از جایی کپی می‌کند. */
+        $digits = strtr($q, ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4',
+                             '۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9']);
 
         $users = DB::table('users as u')
             ->leftJoin('zaban_profiles as p', 'p.user_id', '=', 'u.id')
-            ->when($q !== '', fn ($x) => $x->where(function ($w) use ($q) {
+            ->when($q !== '', fn ($x) => $x->where(function ($w) use ($q, $digits) {
                 $w->where('u.name', 'like', "%$q%")
                   ->orWhere('u.email', 'like', "%$q%")
-                  ->orWhere('p.nickname', 'like', "%$q%");
+                  ->orWhere('p.nickname', 'like', "%$q%")
+                  ->orWhere('u.mobile', 'like', "%$digits%")
+                  ->orWhere('p.university', 'like', "%$q%");
+                if (ctype_digit($digits)) $w->orWhere('u.id', (int) $digits);
             }))
             ->orderByDesc('u.id')
             ->limit(100)
-            ->get(['u.id', 'u.name', 'u.email', 'u.type', 'p.nickname', 'p.exam']);
+            ->get(['u.id', 'u.name', 'u.email', 'u.mobile', 'u.type', 'p.nickname', 'p.exam']);
 
         $ent = DB::table('zaban_entitlements')
             ->whereIn('user_id', $users->pluck('id'))
@@ -279,6 +285,98 @@ class ZabanAdminController extends Controller
             ->map(fn ($g) => $g->pluck('exam')->all());
 
         return view('zaban-admin.users', compact('users', 'ent', 'q'));
+    }
+
+    /** نقش‌هایی که مدیر می‌تواند بدهد. ترتیب از کم‌دسترسی به پردسترسی. */
+    public const ROLES = [
+        'student' => 'دانشجو',
+        'editor'  => 'ویراستار محتوا',
+        'manager' => 'مدیر محتوا',
+        'admin'   => 'مدیر کل',
+    ];
+
+    /** GET /zaban-admin/users/{id} — پرونده‌ی یک کاربر. */
+    public function user(int $id, Pricing $pricing): View
+    {
+        $u = DB::table('users as u')
+            ->leftJoin('zaban_profiles as p', 'p.user_id', '=', 'u.id')
+            ->where('u.id', $id)
+            ->first(['u.id', 'u.name', 'u.email', 'u.mobile', 'u.type', 'u.created_at',
+                     'p.nickname', 'p.exam', 'p.university', 'p.gpa', 'p.quota',
+                     'p.degree', 'p.show_in_board', 'p.new_per_day', 'p.rev_per_day']);
+        abort_if(!$u, 404);
+
+        return view('zaban-admin.user', [
+            'u'     => $u,
+            'roles' => self::ROLES,
+            'ents'  => DB::table('zaban_entitlements')->where('user_id', $id)
+                         ->get()->keyBy('exam'),
+            'until' => $pricing->accessUntil(),
+            'orders' => DB::table('zaban_orders')->where('user_id', $id)
+                          ->orderByDesc('id')->limit(10)
+                          ->get(['id', 'exams', 'payable', 'status', 'paid_at', 'created_at']),
+        ]);
+    }
+
+    /** PUT /zaban-admin/users/{id} — ذخیره‌ی اطلاعات، نقش و دسترسی‌ها. */
+    public function userSave(Request $req, int $id, Pricing $pricing, Entitlements $ent): RedirectResponse
+    {
+        $u = DB::table('users')->where('id', $id)->first(['id', 'type']);
+        abort_if(!$u, 404);
+
+        $d = $req->validate([
+            'name'       => ['required', 'string', 'min:2', 'max:60', 'regex:/^[^<>"&]*$/u'],
+            'nickname'   => ['nullable', 'string', 'max:30', 'regex:/^[^<>"&]*$/u'],
+            'university' => ['nullable', 'string', 'max:60'],
+            'gpa'        => ['nullable', 'numeric', 'between:0,20'],
+            'quota'      => ['nullable', 'string', 'max:30'],
+            'exam'       => ['nullable', Rule::in(Entitlements::EXAMS)],
+            'type'       => ['required', Rule::in(array_keys(self::ROLES))],
+            'exams'      => ['array'],
+            'exams.*'    => [Rule::in(Entitlements::EXAMS)],
+        ], [], ['name' => 'نام و نام خانوادگی', 'gpa' => 'معدل', 'type' => 'سطح کاربری']);
+
+        /* آخرین مدیر کل را نمی‌شود پایین آورد، وگرنه در پنل قفل می‌شویم. */
+        if ($u->type === 'admin' && $d['type'] !== 'admin'
+            && DB::table('users')->where('type', 'admin')->count() <= 1) {
+            return back()->with('error', 'این تنها مدیر کل سامانه است؛ اول یک مدیر دیگر بسازید.');
+        }
+
+        DB::table('users')->where('id', $id)->update([
+            'name' => trim($d['name']), 'type' => $d['type'], 'updated_at' => now(),
+        ]);
+
+        $prof = ['nickname' => $d['nickname'] ?: null, 'university' => $d['university'] ?: null,
+                 'gpa' => $d['gpa'] !== null && $d['gpa'] !== '' ? $d['gpa'] : null,
+                 'quota' => $d['quota'] ?: null, 'updated_at' => now()];
+        if (!empty($d['exam'])) $prof['exam'] = $d['exam'];
+
+        if (DB::table('zaban_profiles')->where('user_id', $id)->exists()) {
+            DB::table('zaban_profiles')->where('user_id', $id)->update($prof);
+        } else {
+            DB::table('zaban_profiles')->insert($prof + [
+                'user_id' => $id, 'exam' => $d['exam'] ?? 'ce',
+                'show_in_board' => 0, 'created_at' => now(),
+            ]);
+        }
+
+        /* دسترسی رشته‌ها: هر تیک‌خورده grant، هر تیک‌نخورده revoke.
+           grant idempotent است، پس تیک‌های قبلی دست‌نخورده می‌مانند و انقضا
+           عقب نمی‌رود. */
+        $want = $d['exams'] ?? [];
+        foreach (Entitlements::EXAMS as $exam) {
+            $has = DB::table('zaban_entitlements')->where(['user_id' => $id, 'exam' => $exam])
+                     ->whereNull('revoked_at')->exists();
+            if (in_array($exam, $want, true) && !$has) {
+                $ent->grant($id, $exam, $pricing->accessUntil(), 'admin', null,
+                            'از پنل مدیریت توسط ' . (auth()->user()->name ?? '—'));
+            } elseif (!in_array($exam, $want, true) && $has) {
+                $ent->revoke($id, $exam, 'از پنل مدیریت توسط ' . (auth()->user()->name ?? '—'));
+            }
+        }
+        $ent->forget($id);
+
+        return redirect()->route('zadmin.user', $id)->with('ok', 'ذخیره شد.');
     }
 
     /* ================= محتوا ================= */
