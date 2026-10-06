@@ -247,6 +247,37 @@ class Checkout
         return ['order_id' => $orderId, 'token' => '', 'pay_url' => '', 'free' => true];
     }
 
+    /**
+     * فعال‌سازی دستی یک سفارش — کارت به کارت یا تراکنشی که از مهلت استعلام
+     * ایران کیش (۷ روز) گذشته و فقط با رسید قابل تأیید است.
+     *
+     * همان مسیر markPaid را می‌رود تا دسترسی و تاریخچه دقیقاً مثل پرداخت
+     * عادی ثبت شود؛ فقط منبعش staff می‌ماند و یادداشت مدیر کنارش می‌نشیند.
+     */
+    public function activateManually(int $orderId, string $note, ?int $byUserId = null): void
+    {
+        DB::transaction(function () use ($orderId, $note, $byUserId) {
+            $order = DB::table('zaban_orders')->where('id', $orderId)->lockForUpdate()->first();
+            if (!$order) throw new RuntimeException('سفارش پیدا نشد.');
+            if ($order->status === 'paid') throw new RuntimeException('این سفارش از قبل پرداخت‌شده است.');
+
+            DB::table('zaban_orders')->where('id', $orderId)->update([
+                'status' => 'paid', 'gateway' => 'manual', 'gateway_code' => '00',
+                'paid_at' => now(), 'updated_at' => now(),
+            ]);
+            foreach (array_filter(explode(',', $order->exams)) as $exam) {
+                $this->ent->grant((int) $order->user_id, $exam, $order->expires_at,
+                                  'staff', (int) $order->id, $note);
+            }
+        });
+
+        $uid = (int) DB::table('zaban_orders')->where('id', $orderId)->value('user_id');
+        $this->ent->forget($uid);
+        Log::warning('[Checkout] manual activation', [
+            'order' => $orderId, 'user' => $uid, 'by' => $byUserId, 'note' => $note,
+        ]);
+    }
+
     private function markPaid(int $orderId): void
     {
         DB::transaction(function () use ($orderId) {

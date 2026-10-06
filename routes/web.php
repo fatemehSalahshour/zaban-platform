@@ -130,6 +130,13 @@ Route::middleware(['auth', 'zaban.admin'])
         Route::put('/users/{id}', [ZabanAdminController::class, 'userSave'])
             ->whereNumber('id')->name('user.save');
 
+        /* سفارش‌ها: استعلام دوباره از درگاه و فعال‌سازی دستی کارت به کارت */
+        Route::get('/orders', [ZabanAdminController::class, 'orders'])->name('orders');
+        Route::post('/orders/{id}/recheck', [ZabanAdminController::class, 'orderRecheck'])
+            ->whereNumber('id')->name('order.recheck');
+        Route::post('/orders/{id}/activate', [ZabanAdminController::class, 'orderActivate'])
+            ->whereNumber('id')->name('order.activate');
+
         /* اصلاح پیوند کلمه به سؤال — ظهور اشتباهی که از اکسل آمده */
         Route::get('/words', [\App\Http\Controllers\ZabanAdminWordsController::class, 'index'])
             ->name('words');

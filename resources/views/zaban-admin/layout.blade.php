@@ -127,6 +127,7 @@ th.num{text-align:right}
     <a href="{{ route('zadmin.dashboard') }}" class="{{ request()->routeIs('zadmin.dashboard') ? 'on' : '' }}">خلاصه‌ی وضعیت</a>
     <a href="{{ route('zadmin.settings') }}"  class="{{ request()->routeIs('zadmin.settings')  ? 'on' : '' }}">قیمت و تاریخ کنکور</a>
     <a href="{{ route('zadmin.users') }}"     class="{{ request()->routeIs('zadmin.users')     ? 'on' : '' }}">کاربران و دسترسی‌ها</a>
+    <a href="{{ route('zadmin.orders') }}"    class="{{ request()->routeIs('zadmin.order*') ? 'on' : '' }}">سفارش‌ها و پرداخت‌ها</a>
     <a href="{{ route('zadmin.content') }}"   class="{{ request()->routeIs('zadmin.content')   ? 'on' : '' }}">محتوای بانک</a>
     @php
       /* تنها عددی که در نوار کناری می‌آید: کاری که منتظر مدیر است. */

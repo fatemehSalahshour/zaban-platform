@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\ContentBuilder;
 use App\Services\Entitlements;
+use App\Services\Payment\Checkout;
 use App\Services\Pricing;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\RedirectResponse;
@@ -285,6 +286,84 @@ class ZabanAdminController extends Controller
             ->map(fn ($g) => $g->pluck('exam')->all());
 
         return view('zaban-admin.users', compact('users', 'ent', 'q'));
+    }
+
+    /* ==================== سفارش‌ها ====================
+       بدون این صفحه، هر سفارش گیرکرده یعنی رفتن سراغ خط فرمان. و چون
+       پای پول کاربر وسط است، آن مسیر هم کند است هم ترسناک. */
+
+    /** GET /zaban-admin/orders */
+    public function orders(Request $req): View
+    {
+        $state = $req->query('state', 'stuck');
+        $q     = trim((string) $req->query('q', ''));
+        $digits = strtr($q, ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4',
+                             '۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9']);
+
+        $orders = DB::table('zaban_orders as o')
+            ->join('users as u', 'u.id', '=', 'o.user_id')
+            ->when($state === 'stuck',  fn ($x) => $x->whereIn('o.status', ['pending', 'verifying']))
+            ->when($state === 'paid',   fn ($x) => $x->where('o.status', 'paid'))
+            ->when($state === 'failed', fn ($x) => $x->whereIn('o.status', ['failed', 'expired']))
+            ->when($q !== '', fn ($x) => $x->where(function ($w) use ($q, $digits) {
+                $w->where('u.mobile', 'like', "%$digits%")->orWhere('u.name', 'like', "%$q%");
+                if (ctype_digit($digits)) $w->orWhere('o.id', (int) $digits);
+            }))
+            ->orderByDesc('o.id')->limit(150)
+            ->get(['o.id', 'o.user_id', 'o.exams', 'o.payable', 'o.status', 'o.gateway',
+                   'o.gateway_code', 'o.token', 'o.rrn', 'o.created_at', 'o.paid_at',
+                   'u.name', 'u.mobile']);
+
+        return view('zaban-admin.orders', [
+            'orders' => $orders,
+            'state'  => $state,
+            'q'      => $q,
+            'counts' => DB::table('zaban_orders')
+                ->selectRaw("SUM(status IN ('pending','verifying')) AS stuck,
+                             SUM(status = 'paid') AS paid,
+                             SUM(status IN ('failed','expired')) AS failed")
+                ->first(),
+        ]);
+    }
+
+    /** POST /zaban-admin/orders/{id}/recheck — استعلام دوباره از درگاه. */
+    public function orderRecheck(int $id, Checkout $checkout): RedirectResponse
+    {
+        $o = DB::table('zaban_orders')->where('id', $id)->first();
+        if (!$o) return back()->with('error', 'سفارش پیدا نشد.');
+        if ($o->status === 'paid') return back()->with('ok', 'این سفارش از قبل پرداخت‌شده است.');
+
+        try {
+            $r = $checkout->reconcile($o);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'استعلام انجام نشد: ' . $e->getMessage());
+        }
+
+        /* خروجی خام reconcile به فارسی، وگرنه مدیر باید حدس بزند */
+        return back()->with('ok', match ($r) {
+            'paid-by-inquiry' => 'درگاه پرداخت را تأیید کرد؛ دسترسی باز شد.',
+            'retried-confirm' => 'تأییدیه دوباره فرستاده شد؛ چند لحظه بعد دوباره بررسی کنید.',
+            'closed'          => 'درگاه می‌گوید پرداخت نشده؛ سفارش بسته شد.',
+            'inquiry-error'   => 'درگاه جواب نداد. بعداً دوباره امتحان کنید.',
+            'waiting'         => 'هنوز زود است — سفارش تازه است و باید چند دقیقه بگذرد.',
+            default           => 'بررسی شد: ' . $r,
+        });
+    }
+
+    /** POST /zaban-admin/orders/{id}/activate — فعال‌سازی دستی (کارت به کارت). */
+    public function orderActivate(Request $req, int $id, Checkout $checkout): RedirectResponse
+    {
+        $d = $req->validate(
+            ['note' => ['required', 'string', 'min:4', 'max:200']],
+            [], ['note' => 'توضیح پرداخت']
+        );
+
+        try {
+            $checkout->activateManually($id, $d['note'], $req->user()->id);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'فعال نشد: ' . $e->getMessage());
+        }
+        return back()->with('ok', 'سفارش دستی فعال شد و دسترسی باز شد.');
     }
 
     /** نقش‌هایی که مدیر می‌تواند بدهد. ترتیب از کم‌دسترسی به پردسترسی. */
