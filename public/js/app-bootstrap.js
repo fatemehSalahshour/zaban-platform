@@ -497,9 +497,21 @@ window.ZABAN = (function () {
        خودشان به id تبدیل می‌کنند. */
     deck(word, on)     { const id = WID[word]; if (id) push('POST', '/deck', { t: 'w', id, on }); },
     deckQ(qid, on)     { push('POST', '/deck', { t: 'q', id: qid, on }); },
+    /* سرور هر درخواست را تا ۵۰۰ شناسه می‌پذیرد، پس تکه‌تکه می‌فرستیم.
+       بدون این، «افزودن همه‌ی نتایج به دک» روی بانک کامل هزاران درخواست
+       تک‌نفره می‌ساخت: صف نوشتن دقایق طولانی بند می‌آمد و ثبت مرور و آزمون
+       که پشت همان صف بودند، عملاً از دست می‌رفت. */
     deckBulk(words, on){
       const ids = words.map(w => WID[w]).filter(Boolean);
-      if (ids.length) push('POST', '/deck', { t: 'w', ids, on });
+      for (let i = 0; i < ids.length; i += 500) {
+        push('POST', '/deck', { t: 'w', ids: ids.slice(i, i + 500), on });
+      }
+    },
+    deckQBulk(qids, on){
+      const ids = (qids || []).filter(Boolean);
+      for (let i = 0; i < ids.length; i += 500) {
+        push('POST', '/deck', { t: 'q', ids: ids.slice(i, i + 500), on });
+      }
     },
     star(word, on)     { const id = WID[word]; if (id) push('POST', '/star', { t: 'w', id, on }); },
     /* ستاره‌دار کردن سؤال. مسیر /star از قبل t:'q' را می‌پذیرد. */

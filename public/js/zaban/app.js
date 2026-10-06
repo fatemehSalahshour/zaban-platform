@@ -177,18 +177,46 @@ function __quietSets(f){__setsQuiet=true;try{f()}finally{__setsQuiet=false}}
 (function syncSets(){
   /* کلید سؤال در صفحه «سال|رشته|شماره» است ولی سرور id می‌خواهد. */
   const qidOf=k=>{const q=(window.QBYKEY||{})[k];return q?q.id:null};
-  function wrap(set,send){
+  /* تغییرها دسته‌ای فرستاده می‌شوند، نه دانه‌دانه.
+     چرا: جاهایی مثل «افزودن همه‌ی نتایج به دک» یا «برترین‌های پیش‌بینی»
+     با یک کلیک هزاران بار add صدا می‌زنند. هر کدام یک درخواست جدا می‌ساخت و
+     صف نوشتن دقایق طولانی بند می‌آمد؛ ثبت مرور و آزمون هم که پشت همان صف
+     بودند، دیر یا هرگز نمی‌رسیدند — دقیقاً همان «ذخیره نمی‌شود» که کاربرها
+     گزارش کردند. حالا تغییرهای یک لحظه جمع می‌شوند و یک‌جا می‌روند. */
+  function wrap(set,sendOne,sendMany){
     const add=set.add.bind(set), del=set.delete.bind(set);
+    const on=new Set(), off=new Set();
+    let timer=null;
+
+    function flush(){
+      timer=null;
+      const a=[...on], d=[...off];
+      on.clear(); off.clear();
+      try{
+        if(a.length) sendMany ? sendMany(a,true)  : a.forEach(k=>sendOne(k,true));
+        if(d.length) sendMany ? sendMany(d,false) : d.forEach(k=>sendOne(k,false));
+      }catch(e){console.error(e)}
+    }
+    function queue(k,isOn){
+      /* آخرین وضعیت برنده است: زدن و برداشتن سریع نباید دو درخواست بسازد */
+      (isOn?off:on).delete(k);
+      (isOn?on:off).add(k);
+      if(!timer)timer=setTimeout(flush,80);
+    }
+    /* بستن صفحه نباید تغییرهای نرفته را ببلعد */
+    window.addEventListener("pagehide",()=>{if(timer){clearTimeout(timer);flush()}});
+
     set.add=function(k){const had=set.has(k);const r=add(k);
-      if(!__setsQuiet&&!had)try{send(k,true)}catch(e){console.error(e)}
+      if(!__setsQuiet&&!had)queue(k,true);
       return r};
     set.delete=function(k){const had=set.has(k);const r=del(k);
-      if(!__setsQuiet&&had)try{send(k,false)}catch(e){console.error(e)}
+      if(!__setsQuiet&&had)queue(k,false);
       return r};
   }
-  wrap(deck,  (k,on)=>ZABAN.deck(k,on));
+  wrap(deck,  (k,on)=>ZABAN.deck(k,on),  (ks,on)=>ZABAN.deckBulk(ks,on));
   wrap(star,  (k,on)=>ZABAN.star(k,on));
-  wrap(deckQ, (k,on)=>{const id=qidOf(k); if(id)ZABAN.deckQ(id,on)});
+  wrap(deckQ, (k,on)=>{const id=qidOf(k); if(id)ZABAN.deckQ(id,on)},
+              (ks,on)=>ZABAN.deckQBulk(ks.map(qidOf).filter(Boolean),on));
   wrap(starQ, (k,on)=>{const id=qidOf(k); if(id)ZABAN.starQ(id,on)});
 })();
 
