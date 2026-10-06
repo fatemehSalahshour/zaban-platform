@@ -495,22 +495,25 @@ window.ZABAN = (function () {
 
     /* هر چهار تا «متن کلمه» می‌گیرند (همان چیزی که پروتوتایپ دارد) و
        خودشان به id تبدیل می‌کنند. */
-    deck(word, on)     { const id = WID[word]; if (id) push('POST', '/deck', { t: 'w', id, on }); },
-    deckQ(qid, on)     { push('POST', '/deck', { t: 'q', id: qid, on }); },
+    /* src فقط برای ردیابی است: کدام دکمه‌ی صفحه این تغییر را ساخته.
+       سرور افزودن‌های بزرگ را با همین برچسب در لاگ می‌نویسد، تا وقتی دک
+       کاربری ناخواسته پر می‌شود بشود فهمید از کجا آمده — نه با حدس. */
+    deck(word, on, src) { const id = WID[word]; if (id) push('POST', '/deck', { t: 'w', id, on, src }); },
+    deckQ(qid, on, src) { push('POST', '/deck', { t: 'q', id: qid, on, src }); },
     /* سرور هر درخواست را تا ۵۰۰ شناسه می‌پذیرد، پس تکه‌تکه می‌فرستیم.
        بدون این، «افزودن همه‌ی نتایج به دک» روی بانک کامل هزاران درخواست
        تک‌نفره می‌ساخت: صف نوشتن دقایق طولانی بند می‌آمد و ثبت مرور و آزمون
        که پشت همان صف بودند، عملاً از دست می‌رفت. */
-    deckBulk(words, on){
+    deckBulk(words, on, src){
       const ids = words.map(w => WID[w]).filter(Boolean);
       for (let i = 0; i < ids.length; i += 500) {
-        push('POST', '/deck', { t: 'w', ids: ids.slice(i, i + 500), on });
+        push('POST', '/deck', { t: 'w', ids: ids.slice(i, i + 500), on, src });
       }
     },
-    deckQBulk(qids, on){
+    deckQBulk(qids, on, src){
       const ids = (qids || []).filter(Boolean);
       for (let i = 0; i < ids.length; i += 500) {
-        push('POST', '/deck', { t: 'q', ids: ids.slice(i, i + 500), on });
+        push('POST', '/deck', { t: 'q', ids: ids.slice(i, i + 500), on, src });
       }
     },
     star(word, on)     { const id = WID[word]; if (id) push('POST', '/star', { t: 'w', id, on }); },

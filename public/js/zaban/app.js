@@ -172,6 +172,30 @@ const starQ=new Set();
    کدام یک فراخوانی سرور اضافه کنیم — که یکی‌اش حتماً جا می‌افتد — خودِ
    add و delete را یک بار پوشش می‌دهیم. از این به بعد هر تغییری در این
    چهار مجموعه، هر جای کد که باشد، خودکار روی سرور هم ثبت می‌شود. */
+/* ---- ردیابی منبع تغییرهای دک ----
+   دکمه‌های زیادی به دک اضافه می‌کنند: تیک تک‌کلمه، «کلمات این تست»،
+   «کلمات متن»، برترین‌های پیش‌بینی، منتخب‌ها، جبران دفترچه. وقتی دک کاربری
+   ناخواسته پر می‌شود، بدون این برچسب فقط می‌شود حدس زد کدام بوده.
+   آخرین کلیک صفحه برچسب را می‌سازد و همان با درخواست می‌رود. */
+let __deckSrc="";
+const DECK_SRC_MAP={
+  toggle:"تیک کلمه", tdeck:"کلمات این تست", wtoggle:"کلمات گروه",
+  rtoggle:"تست‌های گروه", qdeck:"تست تکی", sqadd:"دسته‌ی تست‌ها"
+};
+document.addEventListener("click",e=>{
+  const el=e.target && e.target.closest ? e.target.closest("[data-toggle],[data-tdeck],[data-wtoggle],[data-rtoggle],[data-qdeck],[data-sqadd],#addResults,#addTop,#starToDeck,#crowdAdd,[data-balgo],#prAddTop") : null;
+  if(!el){ __deckSrc=""; return }
+  const byId={addResults:"نتایج فهرست کلمات", addTop:"برترین‌های نمودار",
+              starToDeck:"منتخب‌ها", crowdAdd:"آمار جمعی", prAddTop:"پیش‌بینی کنکور"};
+  let tag=byId[el.id]||"";
+  if(!tag)for(const k in DECK_SRC_MAP){ if(el.hasAttribute("data-"+k)){tag=DECK_SRC_MAP[k];break} }
+  if(!tag&&el.hasAttribute("data-balgo"))tag="جبران دفترچه";
+  /* تب باز هم مهم است: همان دکمه در مطالعه‌ی ترتیبی و در تست‌ها فرق دارد */
+  const tab=(document.querySelector(".tabs .on,[data-tab].on")||{}).dataset;
+  __deckSrc=(tag||"نامشخص")+(tab&&tab.tab?" · "+tab.tab:"");
+},true);
+function deckSrc(){return __deckSrc||"نامشخص"}
+
 let __setsQuiet=false;
 function __quietSets(f){__setsQuiet=true;try{f()}finally{__setsQuiet=false}}
 (function syncSets(){
@@ -213,10 +237,10 @@ function __quietSets(f){__setsQuiet=true;try{f()}finally{__setsQuiet=false}}
       if(!__setsQuiet&&had)queue(k,false);
       return r};
   }
-  wrap(deck,  (k,on)=>ZABAN.deck(k,on),  (ks,on)=>ZABAN.deckBulk(ks,on));
+  wrap(deck,  (k,on)=>ZABAN.deck(k,on,deckSrc()),  (ks,on)=>ZABAN.deckBulk(ks,on,deckSrc()));
   wrap(star,  (k,on)=>ZABAN.star(k,on));
-  wrap(deckQ, (k,on)=>{const id=qidOf(k); if(id)ZABAN.deckQ(id,on)},
-              (ks,on)=>ZABAN.deckQBulk(ks.map(qidOf).filter(Boolean),on));
+  wrap(deckQ, (k,on)=>{const id=qidOf(k); if(id)ZABAN.deckQ(id,on,deckSrc())},
+              (ks,on)=>ZABAN.deckQBulk(ks.map(qidOf).filter(Boolean),on,deckSrc()));
   wrap(starQ, (k,on)=>{const id=qidOf(k); if(id)ZABAN.starQ(id,on)});
 })();
 

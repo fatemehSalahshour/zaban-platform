@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 class ZabanController extends Controller
@@ -824,6 +825,8 @@ class ZabanController extends Controller
             'ids' => 'array|max:500',
             'ids.*' => 'integer|min:1',
             'on'  => 'required|boolean',
+            /* برچسب دکمه‌ی مبدأ — فقط برای لاگ، در هیچ تصمیمی اثر ندارد */
+            'src' => 'nullable|string|max:40',
         ]);
 
         $type = $d['t'] === 'w' ? 'word' : 'question';
@@ -831,6 +834,16 @@ class ZabanController extends Controller
         $ids  = $this->filterEntitledItems($req->user()->id, $type, $ids);
 
         if (!$ids) return response()->json(['ok' => true, 'changed' => 0]);
+
+        /* افزودن‌های بزرگ را ثبت می‌کنیم. چند کاربر گزارش کردند دکشان
+           ناخواسته هزاران کارت شده و از روی داده نمی‌شد فهمید کدام دکمه
+           این کار را کرده. با این لاگ، دفعه‌ی بعد حدس لازم نیست. */
+        if (count($ids) >= 20) {
+            Log::info('[deck] bulk', [
+                'user' => $req->user()->id, 'type' => $type, 'on' => $d['on'],
+                'n' => count($ids), 'src' => $d['src'] ?? null,
+            ]);
+        }
 
         if ($d['on']) {
             $rows = array_map(fn ($id) => [
