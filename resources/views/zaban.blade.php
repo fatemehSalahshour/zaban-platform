@@ -550,7 +550,9 @@
 </div></div>
 <div class="toast" id="toast"></div>
 <div class="scrim" id="askM"><div class="sheet" style="max-width:430px;padding:22px">
-  <div id="askMsg" style="font-size:15.5px;line-height:2;margin-bottom:16px"></div>
+  {{-- pre-line لازم است: متن تأیید گاهی دو پاراگراف دارد و textContent
+       خط را نمی‌شکند --}}
+  <div id="askMsg" style="font-size:15.5px;line-height:2;margin-bottom:16px;white-space:pre-line"></div>
   <div class="row-f"><button class="deckbtn" id="askYes" style="flex:1">بله</button>
     <button class="ghost" id="askNo">انصراف</button></div>
 </div></div>

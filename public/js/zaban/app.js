@@ -408,7 +408,7 @@ $("#activeFilters").addEventListener("click",e=>{
 $("#addResults").addEventListener("click",()=>{
   const r=filtered();
   if(!r.length)return;
-  askConfirm(`${fa(r.length)} کلمه به دک مرور شما اضافه شود؟`,()=>{r.forEach(w=>deck.add(w.w));render();toast("اضافه شد.")});
+  askBulkDeck(r.length, "کلمه", ()=>{r.forEach(w=>deck.add(w.w));render();toast("اضافه شد.")});
 });
 function bindRow(sel,extra){
   $(sel).addEventListener("click",e=>{
@@ -988,7 +988,7 @@ $("#ssub").addEventListener("click",e=>{const b=e.target.closest("[data-ssub]");
     if(!e.target.closest("[data-sqadd]"))return;
     const ks=sqKeys(SF.qst).filter(k=>!deckQ.has(k));
     if(!ks.length){toast("همه‌ی این تست‌ها از قبل در دک مرور شما هستند.");return}
-    askConfirm(`${fa(ks.length)} تست به دک مرور شما اضافه شود؟`,()=>{
+    askBulkDeck(ks.length, "تست", ()=>{
       ks.forEach(k=>deckQ.add(k));refreshAll();toast("اضافه شد.")});
   });
 })();
@@ -1122,7 +1122,7 @@ $("#ssec").addEventListener("click",e=>{const b=e.target.closest("[data-ssec]");
   SF[id==="syear"?"year":"exam"]=e.target.value;renderStar()}));
 $("#starToDeck").addEventListener("click",()=>{
   const n=star.size+starQ.size;
-  if(n)askConfirm(`${fa(n)} مورد منتخب به دک مرور اضافه شود؟`,()=>{star.forEach(k=>deck.add(k));starQ.forEach(k=>deckQ.add(k));refreshAll();toast("اضافه شد.")});
+  askBulkDeck(n, "مورد منتخب", ()=>{star.forEach(k=>deck.add(k));starQ.forEach(k=>deckQ.add(k));refreshAll();toast("اضافه شد.")});
 });
 
 /* ---------------- مطالعه‌ی ترتیبی ---------------- */
@@ -1732,7 +1732,7 @@ $("#cMode").addEventListener("click",e=>{const b=e.target.closest("[data-m]");if
 $("#chart2").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(b)openDetail(WORDS[+b.dataset.i])});
 $("#addTop").addEventListener("click",()=>{
   const list=C.top?topList.slice(0,C.top):topList;
-  if(list.length)askConfirm(`${fa(list.length)} کلمه به دک اضافه شود؟`,()=>{list.forEach(x=>deck.add(x.w.w));render();toast("اضافه شد.")});
+  askBulkDeck(list.length, "کلمه", ()=>{list.forEach(x=>deck.add(x.w.w));render();toast("اضافه شد.")});
 });
 
 /* ---------------- مرور ---------------- */
@@ -5586,6 +5586,23 @@ function askConfirm(msg,onYes,yesLabel){
   $("#askYes").textContent=yesLabel||"بله";
   $("#askM").classList.add("open");
 }
+/* تأیید افزودن گروهی به دک.
+   چرا جدا از askConfirm: دکی که یک‌باره هزاران کارت می‌گیرد، عملاً
+   غیرقابل مرور است و خود کاربر را دلسرد می‌کند. پیش از این فقط تعداد
+   را می‌پرسید؛ حالا می‌گوید این تعداد یعنی چند روز مرور. */
+function askBulkDeck(n, what, onYes){
+  if(!n)return;
+  const cap = Math.max(10, NEW_PER_DAY || 20);          /* کارت تازه در روز */
+  const days = Math.ceil(n / cap);
+  let msg = `${fa(n)} ${what} به دک مرور شما اضافه شود؟`;
+  if(n > 500){
+    msg += `\n\nبا سقف روزانه‌ی ${fa(cap)} کارت تازه، رسیدن به ته این دک حدود `
+         + `${fa(days)} روز طول می‌کشد. اگر مطمئن نیستید، اول با فیلتر سال یا سطح `
+         + `کمترش کنید — دک را هر وقت خواستید می‌شود بزرگ‌تر کرد.`;
+  }
+  askConfirm(msg, onYes);
+}
+
 $("#askYes").addEventListener("click",()=>{const f=_ask;_ask=null;$("#askM").classList.remove("open");if(f)f()});
 $("#askNo").addEventListener("click",()=>{_ask=null;$("#askM").classList.remove("open")});
 $("#askM").addEventListener("click",e=>{if(e.target.id==="askM"){_ask=null;$("#askM").classList.remove("open")}});
