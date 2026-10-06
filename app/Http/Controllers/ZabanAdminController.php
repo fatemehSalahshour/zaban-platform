@@ -364,16 +364,30 @@ class ZabanAdminController extends Controller
            grant idempotent است، پس تیک‌های قبلی دست‌نخورده می‌مانند و انقضا
            عقب نمی‌رود. */
         $want = $d['exams'] ?? [];
-        foreach (Entitlements::EXAMS as $exam) {
-            $has = DB::table('zaban_entitlements')->where(['user_id' => $id, 'exam' => $exam])
-                     ->whereNull('revoked_at')->exists();
-            if (in_array($exam, $want, true) && !$has) {
-                $ent->grant($id, $exam, $pricing->accessUntil(), 'admin', null,
-                            'از پنل مدیریت توسط ' . (auth()->user()->name ?? '—'));
-            } elseif (!in_array($exam, $want, true) && $has) {
-                $ent->revoke($id, $exam, 'از پنل مدیریت توسط ' . (auth()->user()->name ?? '—'));
+        $by   = 'از پنل مدیریت توسط ' . (auth()->user()->name ?? '—');
+
+        try {
+            foreach (Entitlements::EXAMS as $exam) {
+                $has = DB::table('zaban_entitlements')->where(['user_id' => $id, 'exam' => $exam])
+                         ->whereNull('revoked_at')->exists();
+                if (in_array($exam, $want, true) && !$has) {
+                    /* 'staff' تنها مقدار مجاز برای اعطای دستی است؛ ستون source
+                       بیش از purchase و staff نمی‌پذیرد و هر چیز دیگری خطای
+                       دیتابیس می‌دهد. */
+                    $ent->grant($id, $exam, $pricing->accessUntil(), 'staff', null, $by);
+                } elseif (!in_array($exam, $want, true) && $has) {
+                    $ent->revoke($id, $exam, $by);
+                }
             }
+        } catch (\Throwable $e) {
+            /* خطای ۵۰۰ در این صفحه یعنی مدیر نمی‌فهمد دسترسی داده شد یا نه،
+               در حالی که کاربر پولش را داده. پس علت را می‌گوییم. */
+            \Illuminate\Support\Facades\Log::error('[Admin] grant failed', [
+                'user' => $id, 'want' => $want, 'err' => $e->getMessage(),
+            ]);
+            return back()->with('error', 'دسترسی ثبت نشد: ' . $e->getMessage());
         }
+
         $ent->forget($id);
 
         return redirect()->route('zadmin.user', $id)->with('ok', 'ذخیره شد.');
