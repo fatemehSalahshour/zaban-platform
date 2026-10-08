@@ -435,9 +435,13 @@ class ZabanController extends Controller
         if ($qa['fresh'] || $qa['limited']) $this->guard->afterWordReveal($uid);
 
         $ex = $this->content->examples($qa['allowed']);
+        /* مترادف و متضاد همراه مثال‌ها — همان دسترسی و همان سقف روزانه */
+        $rel = $this->content->relations($qa['allowed']);
         $sig = fn (array $pairs) => array_map(fn ($p) => [$this->wm->mark($uid, $p[0]), $this->wm->mark($uid, $p[1])], $pairs);
         return $this->obf($req, [
-            'items'         => array_map(fn ($w) => ['id' => $w, 'ex' => $sig($ex[$w] ?? [])], $qa['allowed']),
+            'items'         => array_map(fn ($w) => ['id' => $w, 'ex' => $sig($ex[$w] ?? [])]
+                                   + (isset($rel[$w]) ? ['syn' => $rel[$w]['syn'], 'ant' => $rel[$w]['ant']] : []),
+                                   $qa['allowed']),
             'limited'       => array_values(array_merge($qa['limited'], $trialBlocked)),
             'limit_message' => $trialBlocked
                 ? app(\App\Services\Security\TrialQuota::class)->message()

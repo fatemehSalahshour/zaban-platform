@@ -39,6 +39,8 @@ WORDS.forEach(w => {
    می‌کند از /api/words/detail می‌آید، پشت دسترسی و سقف روزانه (zaban.word_daily_cap).
      EXS[id] === undefined → هنوز نگرفته‌ایم · آرایه → گرفتیم · EX_LIMIT[id] → سقف روزانه */
 const EXS={}, EX_LIMIT={}, EX_WAIT={};
+/* مترادف و متضاد — همراه مثال‌ها از همان /api/words/detail می‌آید: REL[id]={syn,ant} */
+const REL={};
 let EX_LIMIT_MSG="سقف روزانه‌ی دیدن مثال‌ها پر شده است؛ فردا دوباره در دسترس است.";
 function wid(w){ return w.id || (window.WID||{})[w.w] || null }
 function fetchEx(ids){
@@ -49,7 +51,8 @@ function fetchEx(ids){
     const b=need.slice(i,i+40), key=b.join(",");
     if(!EX_WAIT[key]){
       EX_WAIT[key]=ZABAN.wordDetails(b).then(r=>{
-        ((r&&r.items)||[]).forEach(it=>{EXS[it.id]=it.ex||[]});
+        ((r&&r.items)||[]).forEach(it=>{EXS[it.id]=it.ex||[];
+          if((it.syn&&it.syn.length)||(it.ant&&it.ant.length))REL[it.id]={syn:it.syn||[],ant:it.ant||[]}});
         ((r&&r.limited)||[]).forEach(id=>{EX_LIMIT[id]=1});
         if(r&&r.limit_message)EX_LIMIT_MSG=r.limit_message;
         b.forEach(id=>{if(EXS[id]===undefined&&!EX_LIMIT[id])EXS[id]=[]});   /* بی‌دسترسی = بی‌مثال */
@@ -67,6 +70,27 @@ function examplesOf(w,onReady){
   if(EX_LIMIT[id])return EX_LIMIT_MSG;
   fetchEx([id]).then(onReady).catch(e=>console.error(e));
   return "در حال گرفتن مثال‌ها…";
+}
+
+/* مترادف و متضاد یک کلمه. مثال‌ها باید رسیده باشند (همان درخواست) — هر جا
+   examplesOf صدا زده شده، این هم بعد از رسیدن پر است.
+   کلمه‌ای که خودش در بانک است دکمه می‌شود و با زدنش همان کلمه باز می‌شود؛
+   معنی‌اش اینجا خودکار گرفته نمی‌شود تا سقف روزانه‌ی معنی مصرف نشود. */
+function relHTML(w,card){
+  const r=REL[wid(w)];
+  if(!r||(!r.syn.length&&!r.ant.length))return "";
+  const W=window.WID||{};
+  const chip=x=>{
+    const inBank=W[x]!==undefined||W[x.toLowerCase()]!==undefined;
+    return inBank
+      ? `<button class="relc in en" data-relw="${W[x]!==undefined?x:x.toLowerCase()}" data-tip="در بانک لغات هم هست — بزنید تا باز شود">${x}</button>`
+      : `<span class="relc en">${x}</span>`;
+  };
+  const row=(t,list,cls)=>list.length?`<div class="relrow ${cls}"><span class="relk">${t}</span><span class="relv">${list.map(chip).join("")}</span></div>`:"";
+  const body=row("هم‌معنی",r.syn,"syn")+row("متضاد",r.ant,"ant");
+  return card
+    ? `<div class="relbox">${body}</div>`
+    : `<section><div class="label">هم‌معنی و متضاد <span style="font-weight:400">— کلمه‌های رایج‌تر کنار کلمه‌ی کنکوری</span></div><div class="relbox flat">${body}</div></section>`;
 }
 
 /* ===== معنی‌ها — کلمه‌به‌کلمه از سرور (امنیت محتوا، قدم ۳) =====
@@ -777,6 +801,7 @@ function renderWord(w){
      ${(exOpen?ex:ex.slice(0,2)).map(e=>`<div class="ex"><div class="s en">${e[0]}</div><div class="t">${e[1]}</div></div>`).join("")}
      ${ex.length>2?`<button class="ghost" style="width:100%;margin-top:10px" data-exmore="1">${exOpen?"نمایش کمتر":"نمایش همه‌ی "+fa(ex.length)+" مثال"}</button>`:""}</section>`;
    })()}
+   ${relHTML(w,false)}
    ${k.length?`<section><div class="label">هم‌خانواده‌ها</div><div class="kin">${k.map(x=>`<span class="en">${x.w}</span>`).join("")}</div></section>`:""}
    <section><div class="label">کجا در کنکور آمده است — ${fa(w.freq)} سال، ${fa(w.occ.length)} مورد</div>
      ${(w.ally && w.ally > w.freq) ? `<div class="capt" style="margin:-4px 0 10px">
@@ -790,6 +815,8 @@ function renderWord(w){
 }
 $("#detailBody").addEventListener("click",e=>{
   const s=e.target.closest("[data-say]");if(s){say(s.dataset.say);return}
+  const rw=e.target.closest("[data-relw]");
+  if(rw){const w=WORDS.find(x=>x.w===rw.dataset.relw);if(w)showView({t:"word",w},true);return}
   const om=e.target.closest("[data-occmore]");
   if(om){occOpen=!occOpen;renderWord(currentWord);return}
   const xm=e.target.closest("[data-exmore]");
@@ -2066,6 +2093,7 @@ function faceHTML(c,back){
       <div style="margin-top:4px">${sayBtns(w.w,true)}</div>
       <div class="rev" style="margin-top:6px">${w.fa}</div>
       <div style="font-size:12px;color:var(--ink-3)">${w.pos}${w.forms?" · "+w.forms.join(" / "):""}</div>
+      ${relHTML(w,true)}
       ${(()=>{ const ex=examplesOf(w,()=>{if(session[pos]===c)paintCard()});
         return typeof ex==="string" ? `<div class="hint" style="margin-top:10px">${ex}</div>`
           : ex.slice(0,2).map(e=>`<div class="ex" style="text-align:right;margin-top:10px"><div class="s en">${e[0]}</div><div class="t">${e[1]}</div></div>`).join(""); })()}</div>`;
@@ -2174,6 +2202,10 @@ $("#rCard").addEventListener("click",e=>{
   const st=e.target.closest("[data-star]");
   if(st){const k=st.dataset.star;star.has(k)?star.delete(k):star.add(k);refreshAll();paintCard();return}
   if(e.target.closest("[data-unflip]")){flipped=false;drawCard(true);return}
+  const rw=e.target.closest("[data-relw]");
+  if(rw){const w=WORDS.find(x=>x.w===rw.dataset.relw);
+    if(w){navStack=[];curView=null;showView({t:"review"},false);showView({t:"word",w},true)}
+    return}
   const wl=e.target.closest("[data-w]");
   if(wl){const w=WORDS.find(x=>x.w===wl.dataset.w);
     if(w){navStack=[];curView=null;showView({t:"review"},false);showView({t:"word",w},true)}

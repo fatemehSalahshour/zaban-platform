@@ -375,6 +375,28 @@ class ContentBuilder
             ->mapWithKeys(fn ($v, $k) => [(int) $k => \App\Support\Meanings::normalize((string) $v)])->all();
     }
 
+    /**
+     * مترادف و متضاد کلمه‌ها: [id => ['syn' => [...], 'ant' => [...]]]
+     * فقط کلمه‌هایی که چیزی دارند. تا migration اجرا نشده، خالی.
+     */
+    public function relations(array $wordIds): array
+    {
+        if (!$wordIds) return [];
+        try {
+            $rows = DB::table('words')->whereIn('id', $wordIds)
+                ->where(fn ($q) => $q->whereNotNull('synonyms')->orWhereNotNull('antonyms'))
+                ->get(['id', 'synonyms', 'antonyms']);
+        } catch (\Throwable $e) {
+            return [];                       /* ستون‌ها هنوز ساخته نشده‌اند */
+        }
+        $split = fn ($s) => array_values(array_filter(array_map('trim', explode(',', (string) $s)), 'strlen'));
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(int) $r->id] = ['syn' => $split($r->synonyms), 'ant' => $split($r->antonyms)];
+        }
+        return $out;
+    }
+
     public function examples(array $wordIds): array
     {
         $ex = [];
