@@ -158,6 +158,10 @@ class ZabanAdminController extends Controller
             'revPerDay' => app(\App\Services\Security\Settings::class)->revPerDay(),
             'secFields' => \App\Services\Security\Settings::FIELDS,
 
+            /* درگاه پرداخت: آمادگی فنی (.env) + انتخاب مدیر */
+            'gwReady'   => app(\App\Services\Payment\Gateways::class)->readiness(),
+            'gwPrefs'   => app(\App\Services\Payment\Gateways::class)->prefs(),
+
             'qCount'    => $qCount,
         ]);
     }
@@ -185,12 +189,33 @@ class ZabanAdminController extends Controller
             /* متن تخفیف — روی صفحه‌ی خرید و لندینگ همین نوشته می‌شود */
             'launch_off_title' => ['nullable', 'string', 'max:40'],
             'launch_off_note'  => ['nullable', 'string', 'max:120'],
+            /* درگاه‌های روشن در صفحه‌ی خرید */
+            'gateways'        => ['nullable', 'array'],
+            'gateways.*'      => ['in:' . implode(',', \App\Services\Payment\Gateways::SELECTABLE)],
+            'gateway_default' => ['nullable', 'in:' . implode(',', \App\Services\Payment\Gateways::SELECTABLE)],
         ], [], [
             'p1' => 'قیمت یک رشته', 'p2' => 'قیمت دو رشته', 'p3' => 'قیمت سه رشته',
             'launch_off' => 'درصد تخفیف رونمایی',
         ]);
 
+        /* درگاه‌ها — پیش از هر ذخیره‌ی دیگر بررسی می‌شود تا با خطا چیزی نیمه‌کاره ثبت نشود.
+           دست‌کم یک درگاه «آماده» باید روشن بماند، وگرنه هیچ‌کس نمی‌تواند بخرد. */
+        $gws = app(\App\Services\Payment\Gateways::class);
+        if ($req->boolean('gateways_form')) {
+            $on = array_values(array_unique($data['gateways'] ?? []));
+            $ready = array_keys(array_filter($gws->readiness(), fn ($g) => $g['ready']));
+            if (!array_intersect($on, $ready)) {
+                return back()->withInput()->withErrors(['gateways' => $ready
+                    ? 'دست‌کم یک درگاه آماده باید روشن باشد؛ وگرنه هیچ دانشجویی نمی‌تواند پرداخت کند.'
+                    : 'هیچ درگاهی در .env تنظیم نشده است.']);
+            }
+        }
+
         $pricing->saveBundles([1 => $data['p1'], 2 => $data['p2'], 3 => $data['p3']]);
+
+        if ($req->boolean('gateways_form')) {
+            $gws->savePrefs($on, $data['gateway_default'] ?? null);
+        }
 
         /* تخفیف رونمایی. تاریخ‌ها مثل exam_date شمسی نوشته و میلادی ذخیره
            می‌شوند؛ اگر خام بمانند، مقایسه‌ی بازه سال ۱۴۰۶ میلادی می‌شود و

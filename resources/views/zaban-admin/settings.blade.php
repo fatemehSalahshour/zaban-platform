@@ -35,6 +35,42 @@
       و روی سفارش‌های تازه ثبت می‌شود.</div>
   </div>
 
+  <div class="panel" id="gateways">
+    <h3>درگاه پرداخت</h3>
+    <p>کدام درگاه‌ها در صفحه‌ی خرید به دانشجو نشان داده شوند. اگر یکی مشکل پیدا کرد،
+       تیکش را بردارید و ذخیره کنید — بلافاصله از صفحه‌ی خرید حذف می‌شود.</p>
+
+    <input type="hidden" name="gateways_form" value="1">
+    @php
+      $gwOn  = collect(old('gateways_form') ? old('gateways', []) : $gwPrefs['on']);
+      $gwDef = old('gateway_default', $gwPrefs['default'] ?? $gwOn->first());
+    @endphp
+
+    <div class="gwgrid">
+      @foreach ($gwReady as $key => $g)
+        <label class="gwc {{ $gwOn->contains($key) ? 'on' : '' }} {{ $g['ready'] ? '' : 'off' }}">
+          <input type="checkbox" name="gateways[]" value="{{ $key }}" @checked($gwOn->contains($key))>
+          <span class="box" aria-hidden="true">✓</span>
+          <span class="nm">{{ $g['label'] }}</span>
+          <span class="st {{ $g['ready'] ? 'ready' : '' }}">{{ $g['ready'] ? 'آماده' : $g['why'] }}</span>
+        </label>
+      @endforeach
+    </div>
+
+    <div class="gwdef">
+      <label for="gateway_default">درگاه پیش‌فرض <i>وقتی هر دو روشن‌اند، این از قبل انتخاب شده و اول نشان داده می‌شود</i></label>
+      <select id="gateway_default" name="gateway_default">
+        @foreach ($gwReady as $key => $g)
+          <option value="{{ $key }}" @selected($gwDef === $key)>{{ $g['label'] }}</option>
+        @endforeach
+      </select>
+    </div>
+
+    <p class="gwhelp">حداقل یک درگاه باید روشن باشد. اگر فقط یکی روشن باشد، دانشجو انتخابی نمی‌بیند
+       و مستقیم به همان درگاه می‌رود. درگاهی که «تنظیم نشده» یا «خاموش در <bdi>.env</bdi>» است، حتی اگر
+       تیک بخورد نشان داده نمی‌شود. سفارش‌های قبلی هر درگاه همچنان پیگیری و تأیید می‌شوند.</p>
+  </div>
+
   <div class="panel">
     <h3>تخفیف رونمایی</h3>
     <p>یک تخفیف درصدی مدت‌دار که <b>روی مبلغ نهایی</b> می‌نشیند — یعنی روی تخفیف
@@ -221,11 +257,51 @@
   .chk label{display:flex;align-items:center;gap:6px;cursor:pointer}
   .chk input{accent-color:var(--gold);width:16px;height:16px}
   #trial_cap{max-width:160px}
+  /* درگاه پرداخت */
+  .gwgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,250px));gap:12px;margin-bottom:18px}
+  .gwc{position:relative;display:flex;align-items:center;gap:10px;border:1px solid var(--line-2);
+       border-radius:var(--r);padding:13px 14px;cursor:pointer;background:#fff;transition:.15s}
+  .gwc:hover{border-color:var(--ink-3)}
+  .gwc input{position:absolute;opacity:0;pointer-events:none}
+  .gwc .box{width:20px;height:20px;border:1.5px solid var(--line-2);border-radius:5px;flex:none;
+       display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;background:#fff}
+  .gwc .nm{font-size:15px;font-weight:700;color:var(--ink)}
+  .gwc .st{margin-inline-start:auto;font-size:11px;padding:2px 9px;border-radius:20px;
+       background:var(--surface);color:var(--ink-3);white-space:nowrap}
+  .gwc .st.ready{background:#e6f2ec;color:var(--green)}
+  .gwc.on{border-color:var(--gold);background:#fdf8ec}
+  .gwc.on .box{border-color:var(--gold);color:var(--gold)}
+  .gwc.off .nm{color:var(--ink-3)}
+  .gwc:focus-within{outline:2px solid var(--gold);outline-offset:2px}
+  .gwdef label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:7px}
+  .gwdef label i{font-style:normal;font-size:11.5px;color:var(--ink-3)}
+  .gwdef select{font-family:inherit;font-size:14px;padding:9px 11px;width:100%;max-width:360px;
+       border:1px solid var(--line-2);border-radius:8px;background:#fff;color:var(--ink)}
+  .gwdef select:focus{outline:2px solid var(--gold);outline-offset:1px}
+  .gwhelp{font-size:12px;color:var(--ink-3);line-height:1.95;margin-top:14px;max-width:none}
   .ver{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);
        font-size:12.5px;color:var(--ink-3)}
 </style>
 
 <script>
+/* کارت درگاه: حالت انتخاب، و درگاه پیش‌فرض فقط از میان روشن‌ها */
+(function () {
+  const cards = [...document.querySelectorAll('.gwc')];
+  const sel = document.getElementById('gateway_default');
+  if (!cards.length || !sel) return;
+  function sync() {
+    const on = cards.filter(c => c.querySelector('input').checked).map(c => c.querySelector('input').value);
+    cards.forEach(c => c.classList.toggle('on', c.querySelector('input').checked));
+    [...sel.options].forEach(o => { o.disabled = !on.includes(o.value); });
+    if (on.length && !on.includes(sel.value)) sel.value = on[0];
+    sel.disabled = on.length < 2;          /* فقط یکی روشن → پیش‌فرض معنی ندارد */
+  }
+  cards.forEach(c => c.querySelector('input').addEventListener('change', sync));
+  /* select غیرفعال فرستاده نمی‌شود؛ پیش از ارسال باز می‌شود تا مقدارش ذخیره شود */
+  sel.form.addEventListener('submit', () => { sel.disabled = false; });
+  sync();
+})();
+
 /* قیمت سرانه‌ی هر پله زنده حساب می‌شود. تصمیم واقعی مدیر همین است:
    «دو رشته‌ای شد نفری ششصد» — نه اینکه عدد کل چقدر باشد. */
 (function () {
