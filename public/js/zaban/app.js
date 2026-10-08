@@ -1301,6 +1301,7 @@ function qUnavailable(y,e,q){
   $("#qBody").innerHTML=`${backBtn()}
     <header class="qsticky"><div style="font-size:19px;font-weight:700">سؤال ${fa(q)} — کنکور ${fa(y)} ${e}</div></header>
     <div class="empty" id="qMiss">در حال بارگذاری سؤال…</div>`;
+  qSheetWide(false);
   const same=()=>curView&&curView.t==="q"&&curView.y===y&&curView.e===e&&curView.q===q;
   const missing=()=>{const m=$("#qMiss"); if(m)m.innerHTML=
     `این سؤال هنوز در بانک سؤال وارد نشده است.<br><span style="font-size:12.5px">دفترچه‌ی کنکور ${fa(y)} ${e}
@@ -1323,8 +1324,13 @@ function renderQuestion(y,e,q){
     fetchAns([Q.qid]).then(()=>{if(curView===v)renderQuestion(y,e,q)}).catch(e=>console.error(e));
   }
   const qk=qKey(y,e,q),keys=ws.map(w=>w.w);
-  const body=(sec==="وکب"?"":textBlock(y,e,sec,pno))
-    +`<div class="qbox"><div class="en" style="text-align:left">${Q.stem.replace("____","<u>____</u>")}</div>${rev&&Q.stemFa?`<div style="font-size:13px;color:var(--ink-2);direction:rtl;text-align:right">${Q.stemFa}</div>`:""}</div>`;
+  /* پسیج و کلوز: پنجره پهن‌تر و در صفحه‌ی بزرگ دوستونه — متن یک طرف با
+     اسکرول خودش، سؤال و گزینه‌ها طرف دیگر؛ مثل دفترچه که متن و سؤال کنار هم‌اند. */
+  const pass=sec==="وکب"?"":textBlock(y,e,sec,pno);
+  const passKey=y+"|"+e+"|"+sec+"|"+(pno||0);
+  const oldPass=$("#qBody .qpass");
+  const keepScroll=oldPass&&oldPass.dataset.k===passKey?oldPass.scrollTop:0;
+  const body=`<div class="qbox"><div class="en" style="text-align:left">${Q.stem.replace("____","<u>____</u>")}</div>${rev&&Q.stemFa?`<div style="font-size:13px;color:var(--ink-2);direction:rtl;text-align:right">${Q.stemFa}</div>`:""}</div>`;
   $("#qBody").innerHTML=`
    ${backBtn()}
    <header class="qsticky"><div style="font-size:19px;font-weight:700">سؤال ${fa(q)} — کنکور ${fa(y)} ${e}</div>
@@ -1348,7 +1354,7 @@ function renderQuestion(y,e,q){
    ${rev&&!exQ?`<div class="row-f qbacktop">
        <button class="ghost" data-qrev="0">← بازگشت به صورت سؤال</button>
      </div>`:""}
-   <section class="qcard ${rev?"rev":""}">${body}
+   <section class="qcard ${rev?"rev":""} ${pass?"split":""}">${pass?`<div class="qpass" data-k="${passKey}">${pass}</div><div class="qmain">`:""}${body}
      ${exQ?`${optsHTML({q,Q},true)}${qTools({q,Q},true)}${rev?answerBox({q,Q,y,e}):""}`:`
      <div class="ex-os ${Q.view===12?"c1":Q.view===6?"c2":"c4"} big">${ordered.map((o,i)=>{
         let c=picked===i?"sel":"";
@@ -1368,8 +1374,19 @@ function renderQuestion(y,e,q){
           ${curView&&curView.stats?qStatsHTML(y,e,q,Q):""}
           ${answerBox({q,Q,y,e})}`
        : `<button class="showbtn" data-qrev="1" style="margin-top:14px">یکی از گزینه‌ها را بزنید، یا پاسخ را ببینید</button>`}`}
-   </section>`;
+   ${pass?"</div>":""}</section>`;
+  qSheetWide(!!pass);
+  /* زدن گزینه کل پنجره را دوباره می‌سازد؛ جای اسکرول متن نباید بپرد
+     (سؤال بعدیِ همان پسیج هم همان‌جا می‌ماند) */
+  const np=$("#qBody .qpass"); if(np&&keepScroll)np.scrollTop=keepScroll;
   $("#detail").classList.remove("open");$("#qview").classList.add("open");
+}
+/* پنجره‌ی سؤال برای پسیج/کلوز پهن‌تر؛ ارتفاع سربرگ چسبان برای ستون متن */
+function qSheetWide(on){
+  const sh=$("#qview .sheet"); if(!sh)return;
+  sh.classList.toggle("wide",on);
+  const hd=$("#qBody .qsticky");
+  sh.style.setProperty("--qh",(on&&hd?hd.offsetHeight:0)+"px");
 }
 $("#qBody").addEventListener("click",e=>{
   /* هر شاخه‌ی این هندلر روی curView می‌نویسد. اگر سؤال از مسیری باز شده باشد
@@ -1474,14 +1491,25 @@ function buildText(y,e,sec,p){
      نمایش داده نمی‌شد و پنجره بدون متن باز می‌ماند. */
   return _txtCache[k] = t ? (typeof t==="string" ? t : (t.en||t.body||"")) : "";
 }
+/* پاراگراف‌های متن — سرور هر پاراگراف را با یک خط خالی جدا می‌فرستد.
+   قبلاً کل متن در یک <p> می‌نشست و HTML اینترها را فاصله حساب می‌کرد، پس
+   پسیج یک‌تکه دیده می‌شد و سؤال «پاراگراف دوم» را نمی‌شد پیدا کرد. */
+function textParas(body){
+  return String(body||"").replace(/\r/g,"").split(/\n+/).map(s=>s.trim()).filter(Boolean);
+}
+function escTxt(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function textBlock(y,e,sec,p){
   const body=buildText(y,e,sec,p);
   if(!body)return "";
   const ws=textWords(y,e,sec,p);
   const title=sec==="پسیج"?"متن پسیج "+fa(p):"متن کلوز تست";
-  return `<div class="passage">
-    <div class="ph"><b>${title}</b><span>${fa(ws.length)} کلمه‌ی بانک در این متن</span></div>
-    <p class="en">${highlight(body,ws)}</p></div>`;
+  const ps=textParas(body);
+  /* شماره‌ی پاراگراف فقط برای پسیج و فقط وقتی بیش از یکی است — همان
+     شماره‌ای که سؤال «paragraph 2» به آن اشاره می‌کند */
+  const num=sec==="پسیج"&&ps.length>1;
+  return `<div class="passage${num?" numbered":""}">
+    <div class="ph"><b>${title}</b><span>${num?fa(ps.length)+" پاراگراف · ":""}${fa(ws.length)} کلمه‌ی بانک در این متن</span></div>
+    <div class="ptext en">${ps.map((t,i)=>`<p class="pp">${num?`<span class="pn" aria-label="پاراگراف ${i+1}">${i+1}</span>`:""}${highlight(escTxt(t),ws)}</p>`).join("")}</div></div>`;
 }
 function renderText(y,e,sec,p){
   const ws=textWords(y,e,sec,p);
@@ -1500,6 +1528,7 @@ function renderText(y,e,sec,p){
         return `<button class="tw" data-w="${w.w}">
           <bdi class="en">${w.w}</bdi><span class="fa">${m||"…"}</span></button>`;
       }).join("")}</div></section>`;
+  qSheetWide(true);
   $("#detail").classList.remove("open");$("#qview").classList.add("open");
 }
 

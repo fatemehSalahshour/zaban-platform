@@ -35,6 +35,10 @@ use Illuminate\Support\Facades\DB;
  *   php artisan zaban:sync-questions                  فقط دفترچه‌های تأییدشده
  *   php artisan zaban:sync-questions --force          حتی ناهمخوان‌ها
  *   php artisan zaban:sync-questions --year=1404
+ *
+ *   php artisan zaban:sync-questions --texts --check   فقط متن پسیج/کلوز: پاراگراف‌ها را مقایسه کن
+ *   php artisan zaban:sync-questions --texts           فقط متن‌ها را با پاراگراف‌بندی درست به‌روز کن
+ *     (سؤال‌ها، گزینه‌ها و شماره‌ها دست نمی‌خورند)
  */
 class SyncQuestions extends Command
 {
@@ -42,7 +46,8 @@ class SyncQuestions extends Command
         {--check   : فقط بررسی کن، چیزی ننویس}
         {--force   : دفترچه‌های ناهمخوان با بانک کلمات را هم وارد کن}
         {--year=   : فقط یک سال}
-        {--exam=   : فقط یک رشته (ce|it|cs)}';
+        {--exam=   : فقط یک رشته (ce|it|cs)}
+        {--texts   : فقط متن پسیج و کلوز (پاراگراف‌بندی) — سؤال‌ها دست نمی‌خورند}';
 
     protected $description = 'آوردن سؤال‌ها و متن‌ها از دیتابیس پلتفرم آزمون';
 
@@ -74,6 +79,10 @@ class SyncQuestions extends Command
 
         $this->info(count($books) . ' دفترچه پیدا شد.');
         $this->newLine();
+
+        if ($this->option('texts')) {
+            return $this->syncTexts($books, $check);
+        }
 
         $ok = $bad = $wrote = 0;
 
@@ -219,8 +228,8 @@ class SyncQuestions extends Command
             $texts[]    = [
                 'section'        => $sec,
                 'passage_number' => $pno,
-                'body'           => $this->clean($p->title),
-                'body_fa'        => $this->clean($p->translate) ?: null,
+                'body'           => $this->cleanText($p->title),
+                'body_fa'        => $this->cleanText($p->translate) ?: null,
             ];
         }
 
@@ -356,7 +365,135 @@ class SyncQuestions extends Command
         });
     }
 
+    /* ---------------- فقط متن‌ها ---------------- */
+
+    /**
+     * متن پسیج و کلوز را با پاراگراف‌بندی درست دوباره از azmoon می‌آورد.
+     * فقط body و body_fa ردیف‌های موجود exam_texts عوض می‌شوند.
+     *
+     * دو محافظ تا متن یک پسیج روی پسیج دیگری ننشیند:
+     *   - دفترچه‌ی ناهمخوان (verify) بدون --force رد می‌شود؛
+     *   - متن تازه باید با متن فعلی همان پسیج تقریباً یکی باشد (فقط فاصله و
+     *     پاراگراف فرق کند)؛ اگر نه، رد و گزارش می‌شود.
+     */
+    private function syncTexts(array $books, bool $check): int
+    {
+        $changed = $same = $skipped = 0;
+        $touched = [];
+
+        foreach ($books as $book) {
+            $exam  = self::MAJOR[$book->major_id];
+            $label = $book->year . ' ' . $exam;
+            $plan  = $this->plan($book);
+            if (!$plan || empty($plan['texts'])) continue;
+
+            $verdict = $this->verify($book, $plan);
+            if (!$verdict['ok'] && !$this->option('force')) {
+                $this->line("  <fg=yellow>!</> {$label} — ناهمخوان، رد شد ({$verdict['why']})");
+                $skipped += count($plan['texts']);
+                continue;
+            }
+
+            foreach ($plan['texts'] as $t) {
+                $name = $t['section'] === 'passage' ? 'پسیج ' . $t['passage_number'] : 'کلوز';
+                /* بدون ستون id (معلوم نیست جدول داشته باشد) — با همان کلید یکتا */
+                $find = fn () => DB::table('exam_texts')->where('year', (int) $book->year)->where('exam', $exam)
+                    ->where('section', $t['section'])
+                    ->where(fn ($q) => $t['passage_number'] === null
+                        ? $q->whereNull('passage_number')->orWhere('passage_number', 0)
+                        : $q->where('passage_number', $t['passage_number']));
+                $row = $find()->first();
+
+                if (!$row) {
+                    $this->line("  <fg=yellow>!</> {$label} {$name} — در exam_texts نیست، رد شد");
+                    $skipped++;
+                    continue;
+                }
+
+                $old = self::paragraphs((string) $row->body);
+                $new = self::paragraphs($t['body']);
+
+                if (self::likeness((string) $row->body, $t['body']) < 85) {
+                    $this->line("  <fg=red>✗</> {$label} {$name} — متن azmoon با متن فعلی فرق دارد، رد شد");
+                    $skipped++;
+                    continue;
+                }
+
+                if ($row->body === $t['body'] && (string) $row->body_fa === (string) $t['body_fa']) {
+                    $same++;
+                    $this->line("  <fg=gray>=</> {$label} {$name} — " . count($new) . ' پاراگراف، بدون تغییر');
+                    continue;
+                }
+
+                $changed++;
+                $this->line("  <fg=green>✓</> {$label} {$name} — " . count($old) . ' → ' . count($new) . ' پاراگراف'
+                    . '  <fg=gray>' . implode(' | ', array_map(fn ($p) => mb_substr($p, 0, 28) . '…', $new)) . '</>');
+
+                if (!$check) {
+                    $find()->update([
+                        'body' => $t['body'], 'body_fa' => $t['body_fa'] ?: $row->body_fa, 'updated_at' => now(),
+                    ]);
+                    $touched[$exam] = true;
+                }
+            }
+        }
+
+        $this->newLine();
+        $this->info("به‌روز: {$changed}   بدون تغییر: {$same}   ردشده: {$skipped}");
+        if ($check) {
+            $this->info('حالت بررسی — چیزی نوشته نشد. برای اعمال، همین دستور را بدون --check بزنید.');
+            return 0;
+        }
+        foreach (array_keys($touched) as $e) {
+            app(\App\Services\ContentBuilder::class)->bump($e);
+        }
+        return 0;
+    }
+
+    /** پاراگراف‌های غیرخالی یک متن */
+    private static function paragraphs(string $s): array
+    {
+        return array_values(array_filter(array_map('trim', preg_split('/\n+/u', $s)), 'strlen'));
+    }
+
+    /** درصد شباهت دو متن بعد از حذف فاصله و علامت‌ها (فقط حروف و رقم) */
+    private static function likeness(string $a, string $b): float
+    {
+        $n = fn ($s) => mb_substr(preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower($s)), 0, 600);
+        $a = $n($a); $b = $n($b);
+        if ($a === '' && $b === '') return 100;
+        similar_text($a, $b, $pct);
+        return $pct;
+    }
+
     /* ---------------- ابزار ---------------- */
+
+    /**
+     * متن پسیج و کلوز — مثل clean، ولی پاراگراف‌ها حفظ می‌شوند.
+     *
+     * در HTML، «اینتر» خام داخل متن فقط فاصله است و پاراگراف را تگ‌ها می‌سازند
+     * (<p>، <div>، <br>). clean این دو را قاطی می‌کرد: اینتر خام وسط یک پاراگراف
+     * می‌ماند و مرز واقعی پاراگراف‌ها یک \n تنها بود. اینجا هر پاراگراف یک بلوک
+     * جدا با یک خط خالی بینشان است — همان چیزی که پلتفرم آزمون نشان می‌دهد.
+     * اگر متن هیچ تگ بلوکی نداشته باشد، خود اینترها مرز پاراگراف‌اند.
+     */
+    private function cleanText(?string $html): string
+    {
+        if ($html === null || trim($html) === '') return '';
+
+        $s = str_replace("\r", '', $html);
+        if (preg_match('~<(p|div|br|li|h[1-6])\b~i', $s)) {
+            $s = preg_replace('/\n+/u', ' ', $s);
+        }
+        $s = preg_replace('~<br\s*/?>~i', "\n", $s);
+        $s = preg_replace('~</?(p|div|li|h[1-6]|blockquote|tr|section|article)\b[^>]*>~i', "\n", $s);
+        $s = strip_tags($s);
+        $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $s = str_replace(["\xC2\xA0", "\xE2\x80\x8B"], ' ', $s);
+        $s = preg_replace('/[ \t]+/u', ' ', $s);
+
+        return implode("\n\n", self::paragraphs($s));
+    }
 
     /**
      * محتوای azmoon همه HTML است: <div dir="ltr">، &hellip;، &zwnj;، &nbsp;.

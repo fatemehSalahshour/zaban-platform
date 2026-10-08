@@ -1727,3 +1727,38 @@ html[data-theme="dim"] .pchip.hi,html[data-theme="dark"] .pchip.hi{background:#3
 /* «بازگشت به صورت سؤال» بالای کارت — هم‌جای دکمه‌ی بازگشت بقیه‌ی صفحه‌ها،
    نه ته صفحه که کاربر باید دنبالش بگردد */
 .qbacktop{margin:0 0 10px}
+
+/* ===== متن پسیج و کلوز: پاراگراف‌بندی و پنجره‌ی پهن ===== */
+/* هر پاراگراف جدا، با فاصله‌ی روشن بین‌شان — مثل دفترچه */
+.passage .ptext{direction:ltr;text-align:left}
+.passage .ptext .pp{font-size:14.5px;line-height:2.05;margin:0 0 .85em;text-align:left;
+  hyphens:auto;-webkit-hyphens:auto}
+.passage .ptext .pp:last-child{margin-bottom:0}
+/* شماره‌ی پاراگراف پسیج در حاشیه — کوچک و کم‌رنگ تا خواندن را به هم نزند */
+.passage.numbered .ptext{padding-left:30px}
+.passage.numbered .pp{position:relative}
+.passage .pn{position:absolute;left:-30px;top:.45em;width:20px;height:20px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;
+  font-family:inherit;color:#9a6a12;background:#fbecd0;border:1px solid #efd7a6;
+  user-select:none;font-variant-numeric:tabular-nums}
+html[data-theme="dark"] .passage .pn,html[data-theme="dim"] .passage .pn{
+  color:#e3b867;background:#2c2416;border-color:#4a3b1f}
+
+/* پنجره‌ی سؤال پسیج/کلوز: پهن‌تر و بلندتر از پنجره‌ی معمولی (۵۶۰) */
+#qview .sheet{transition:max-width .18s ease}
+#qview .sheet.wide{max-width:min(1140px,96vw);max-height:93vh}
+#qview .sheet.wide .passage .ptext .pp{font-size:15.5px;line-height:2.1}
+
+/* صفحه‌ی بزرگ: دوستونه — متن با اسکرول خودش کنار سؤال می‌ماند */
+@media (min-width:1000px){
+  .qcard.split{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px;align-items:start}
+  .qcard.split .qpass{position:sticky;top:calc(var(--qh,0px) + 8px);
+    max-height:calc(93vh - var(--qh,0px) - 40px);overflow:auto;overscroll-behavior:contain;
+    scrollbar-width:thin;border-radius:12px}
+  .qcard.split .qpass .passage{margin-bottom:0}
+  .qcard.split .qmain{min-width:0}
+}
+/* موبایل و تبلت: همان چیدمان زیر هم، فقط متن خواناتر */
+@media (max-width:999px){
+  #qview .sheet.wide{max-height:94vh}
+}
