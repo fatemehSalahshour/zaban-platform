@@ -130,14 +130,21 @@
     <h3>سفارش‌ها</h3>
     <p>ده سفارش آخر همین کاربر.</p>
     <table>
-      <thead><tr><th>#</th><th>رشته‌ها</th><th>مبلغ</th><th>وضعیت</th><th>تاریخ</th></tr></thead>
+      <thead><tr><th>#</th><th>رشته‌ها</th><th>مبلغ</th><th>درگاه / پیگیری</th><th>وضعیت</th><th>تاریخ</th></tr></thead>
       <tbody>
         @foreach ($orders as $o)
           <tr>
             <td class="num">{{ $o->id }}</td>
             <td>{{ $o->exams }}</td>
             <td class="num">{{ \App\Support\FaNum::format($o->payable) }}</td>
-            <td><span class="tag {{ $o->status === 'paid' ? 'gold' : '' }}">{{ $o->status }}</span></td>
+            <td>
+              {{ \App\Services\Payment\Gateways::label($o->gateway) }}
+              @if ($o->ref_id ?: $o->rrn)<span class="num" dir="ltr" style="display:block;font-size:11.5px;color:var(--ink-3);text-align:end">{{ $o->ref_id ?: $o->rrn }}</span>@endif
+            </td>
+            <td>
+              <span class="tag {{ $o->status === 'paid' ? 'gold' : '' }}">{{ \App\Services\Payment\Gateways::status($o->status) }}</span>
+              @if ($o->gateway_code && $o->gateway_code !== '00')<span style="display:block;font-size:11.5px;color:var(--ink-3)">کد {{ $o->gateway_code }}</span>@endif
+            </td>
             <td class="num">{{ \App\Support\Jalali::formatFromGregorian($o->paid_at ?: $o->created_at) }}</td>
           </tr>
         @endforeach

@@ -65,6 +65,34 @@
        padding:13px 26px;font:inherit;font-weight:500;font-size:16px;cursor:pointer;margin-top:14px}
   .cta:hover{background:#14503f}
   .cta[disabled]{background:#b9bec4;cursor:not-allowed}
+
+  /* انتخاب درگاه — فقط وقتی بیش از یک درگاه روشن است */
+  .gws{border:0;margin:14px 0 0;padding:0}
+  .gws legend{font-size:13px;color:var(--ink-2);margin-bottom:8px;padding:0}
+  .gwrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .gw{position:relative;display:flex;align-items:center;gap:8px;border:2px solid var(--line);border-radius:10px;
+       padding:10px 12px;cursor:pointer;font-size:14px;font-weight:500;transition:border-color .15s,background .15s}
+  .gw:hover{border-color:var(--line-2)}
+  .gw input{position:absolute;opacity:0;pointer-events:none}
+  .gw .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line-2);flex-shrink:0;
+       background:var(--paper);transition:.15s}
+  .gw.on{border-color:var(--ok);background:var(--ok-soft)}
+  .gw.on .dot{border-color:var(--ok);box-shadow:inset 0 0 0 3px var(--paper);background:var(--ok)}
+  .gw:focus-within{outline:2px solid var(--gold);outline-offset:2px}
+  .gwnote{font-size:12px;color:var(--ink-3);margin-top:7px;line-height:1.8}
+
+  /* تاریخچه‌ی پرداخت‌ها */
+  .hist{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:22px}
+  .hist h3{font-size:16px;font-weight:700;margin-bottom:12px}
+  .hist .tw{overflow-x:auto}
+  .hist table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:560px}
+  .hist th{font-weight:500;color:var(--ink-3);font-size:12.5px;text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+  .hist td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  .hist tr:last-child td{border-bottom:0}
+  .hist .st{display:inline-block;font-size:12px;border-radius:20px;padding:2px 10px;background:var(--canvas);color:var(--ink-2)}
+  .hist .st.paid{background:var(--ok-soft);color:var(--ok)}
+  .hist .st.failed,.hist .st.expired{background:var(--danger-soft);color:var(--danger)}
+  .hist .ref{font-size:12px;color:var(--ink-3);display:block}
 </style>
 @endpush
 
@@ -147,6 +175,26 @@
           <div class="v" id="total">۰ <span style="font-size:13px;font-weight:400">تومان</span></div>
         </div>
         <div class="savebox" id="save" hidden></div>
+
+        @if (count($gateways) > 1)
+          <fieldset class="gws">
+            <legend>درگاه پرداخت</legend>
+            <div class="gwrow">
+              @foreach ($gateways as $key => $label)
+                <label class="gw {{ $gw === $key ? 'on' : '' }}">
+                  <input type="radio" name="gateway" value="{{ $key }}" @checked($gw === $key)>
+                  <span class="dot" aria-hidden="true"></span>{{ $label }}
+                </label>
+              @endforeach
+            </div>
+            <p class="gwnote">اگر پرداخت با یک درگاه انجام نشد، درگاه دیگر را امتحان کنید.</p>
+          </fieldset>
+        @elseif (count($gateways) === 1)
+          <input type="hidden" name="gateway" value="{{ $gw }}">
+        @else
+          <div class="err" style="margin:14px 0 0">در حال حاضر هیچ درگاه پرداختی فعال نیست. کمی بعد دوباره سر بزنید.</div>
+        @endif
+
         <button class="cta" id="pay" type="submit" disabled>پرداخت و فعال‌سازی</button>
         <div class="hintbox" style="text-align:center">دسترسی تا روز برگزاری کنکور ارشد است.@if ($until)
           <br><span class="num">{{ str_replace('-', '/', \App\Support\Jalali::formatFromGregorian(
@@ -155,6 +203,33 @@
     </div>
   </form>
 
+  @if (count($orders))
+    <section class="hist">
+      <h3>پرداخت‌های شما</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>سفارش</th><th>رشته‌ها</th><th>مبلغ (تومان)</th><th>درگاه</th><th>وضعیت</th><th>تاریخ</th></tr></thead>
+          <tbody>
+            @foreach ($orders as $o)
+              @php $ref = $o->ref_id ?: $o->rrn; @endphp
+              <tr>
+                <td class="num">{{ \App\Support\FaNum::digits($o->id) }}</td>
+                <td>{{ implode('، ', array_map(fn ($e) => $names[$e] ?? $e, array_filter(explode(',', $o->exams)))) }}</td>
+                <td class="num">{{ \App\Support\FaNum::format($o->payable) }}</td>
+                <td>{{ \App\Services\Payment\Gateways::label($o->gateway) }}</td>
+                <td>
+                  <span class="st {{ $o->status }}">{{ \App\Services\Payment\Gateways::status($o->status) }}</span>
+                  @if ($o->status === 'paid' && $ref)<span class="ref num">کد پیگیری: <span dir="ltr">{{ $ref }}</span></span>@endif
+                </td>
+                <td class="num">{{ \App\Support\FaNum::digits(str_replace('-', '/', (string) \App\Support\Jalali::formatFromGregorian((string) ($o->paid_at ?: $o->created_at)))) }}</td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+    </section>
+  @endif
+
 <script>
 (function(){
   const f=document.getElementById('f'), lines=document.getElementById('lines'),
@@ -162,6 +237,7 @@
         totalEl=document.getElementById('total'), wasEl=document.getElementById('was'),
         saveEl=document.getElementById('save');
   const money=n=>Number(n).toLocaleString('fa-IR');
+  const NOGW={{ count($gateways) ? 'false' : 'true' }};
   const toman=n=>money(n)+' تومان';
   const boxes=[...f.querySelectorAll('input[type=checkbox]')];
 
@@ -223,7 +299,7 @@
         saveEl.hidden=false;
       } else saveEl.hidden=true;
 
-      pay.disabled=!(q.payable>0);
+      pay.disabled=!(q.payable>0) || NOGW;
     }catch(e){
       if(my!==seq)return;
       lines.innerHTML='<div class="line"><span>قیمت دریافت نشد. صفحه را دوباره باز کنید.</span></div>';
@@ -231,6 +307,10 @@
     }
   }
   boxes.forEach(b=>b.addEventListener('change',refresh));
+  /* حالت انتخاب‌شده‌ی کارت درگاه */
+  f.querySelectorAll('input[name=gateway][type=radio]').forEach(r=>r.addEventListener('change',()=>{
+    f.querySelectorAll('.gw').forEach(l=>l.classList.toggle('on',l.querySelector('input').checked));
+  }));
   f.addEventListener('submit',()=>{pay.disabled=true;pay.textContent='در حال انتقال به درگاه…'});
   refresh();
 })();

@@ -5,9 +5,11 @@
 <div class="head">
   <h2>سفارش‌ها</h2>
   <p>
-    سفارش گیرکرده یعنی کاربر به درگاه رفته و نتیجه برنگشته. «بررسی دوباره» از ایران کیش
-    استعلام می‌گیرد و اگر پرداخت واقعاً انجام شده باشد، خودش دسترسی را باز می‌کند.
-    مهلت استعلام درگاه هفت روز است؛ قدیمی‌تر از آن فقط با رسید و فعال‌سازی دستی حل می‌شود.
+    سفارش گیرکرده یعنی کاربر به درگاه رفته و نتیجه برنگشته. «بررسی دوباره» از همان درگاهی
+    که کاربر با آن پرداخت کرده (ایران کیش یا زرین‌پال) می‌پرسد و اگر پرداخت واقعاً انجام شده
+    باشد، خودش دسترسی را باز می‌کند. سفارش تازه (کمتر از ۲۵ دقیقه) را دست نمی‌زند، چون ممکن
+    است کاربر هنوز در صفحه‌ی درگاه باشد. مهلت استعلام ایران کیش هفت روز است و زرین‌پال
+    تراکنش تأییدنشده را خودش برمی‌گرداند؛ موارد قدیمی‌تر فقط با رسید و فعال‌سازی دستی حل می‌شود.
   </p>
 </div>
 
@@ -31,7 +33,7 @@
 
   <form method="get" class="search">
     <input type="hidden" name="state" value="{{ $state }}">
-    <input type="search" name="q" value="{{ $q }}" placeholder="موبایل، نام یا شماره‌ی سفارش">
+    <input type="search" name="q" value="{{ $q }}" placeholder="موبایل، نام، شماره‌ی سفارش یا کد پیگیری">
     <button class="btn ghost" type="submit">جست‌وجو</button>
   </form>
 
@@ -41,7 +43,7 @@
     <table>
       <thead>
         <tr><th>#</th><th>کاربر</th><th>رشته‌ها</th><th>مبلغ</th>
-            <th>وضعیت</th><th>تاریخ</th><th></th></tr>
+            <th>درگاه / پیگیری</th><th>وضعیت</th><th>تاریخ</th><th></th></tr>
       </thead>
       <tbody>
         @foreach ($orders as $o)
@@ -52,11 +54,21 @@
               <span class="sub">{{ $o->mobile }}</span>
             </td>
             <td>{{ $o->exams }}</td>
-            <td class="num">{{ \App\Support\FaNum::format($o->payable) }}</td>
+            <td class="num">
+              {{ \App\Support\FaNum::format($o->payable) }}
+              @if ($o->amount_rial) <span class="sub">{{ \App\Support\FaNum::format($o->amount_rial) }} ریال</span> @endif
+            </td>
             <td>
-              <span class="tag {{ $o->status === 'paid' ? 'gold' : '' }}">{{ $o->status }}</span>
-              @if ($o->gateway_code) <span class="sub">کد {{ $o->gateway_code }}</span> @endif
-              @if ($o->gateway === 'manual') <span class="sub">دستی</span> @endif
+              {{ \App\Services\Payment\Gateways::label($o->gateway) }}
+              @if ($o->ref_id ?: $o->rrn)
+                <span class="sub num" dir="ltr" style="text-align:end">{{ $o->ref_id ?: $o->rrn }}</span>
+              @elseif ($o->token && $o->status !== 'paid')
+                <span class="sub num" dir="ltr" style="text-align:end" title="شناسه‌ی تراکنش">{{ \Illuminate\Support\Str::limit($o->token, 18, '…') }}</span>
+              @endif
+            </td>
+            <td>
+              <span class="tag {{ $o->status === 'paid' ? 'gold' : '' }}">{{ \App\Services\Payment\Gateways::status($o->status) }}</span>
+              @if ($o->gateway_code && $o->gateway_code !== '00') <span class="sub">کد {{ $o->gateway_code }}</span> @endif
               @if (!$o->token && $o->status !== 'paid') <span class="sub">به درگاه نرسیده</span> @endif
             </td>
             <td class="num">
@@ -75,7 +87,7 @@
 
           @if ($o->status !== 'paid')
             <tr class="manrow" id="man{{ $o->id }}" hidden>
-              <td colspan="7">
+              <td colspan="8">
                 <form method="post" action="{{ route('zadmin.order.activate', $o->id) }}" class="manform">
                   @csrf
                   <label for="note{{ $o->id }}">

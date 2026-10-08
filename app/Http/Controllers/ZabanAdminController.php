@@ -307,11 +307,18 @@ class ZabanAdminController extends Controller
             ->when($state === 'failed', fn ($x) => $x->whereIn('o.status', ['failed', 'expired']))
             ->when($q !== '', fn ($x) => $x->where(function ($w) use ($q, $digits) {
                 $w->where('u.mobile', 'like', "%$digits%")->orWhere('u.name', 'like', "%$q%");
-                if (ctype_digit($digits)) $w->orWhere('o.id', (int) $digits);
+                if (ctype_digit($digits)) {
+                    $w->orWhere('o.id', (int) $digits)
+                      /* کد پیگیری که کاربر از رسید درگاه می‌فرستد */
+                      ->orWhere('o.ref_id', $digits)->orWhere('o.rrn', $digits);
+                }
+                /* شناسه‌ی تراکنش زرین‌پال (Authority) یا نشانه‌ی ایران کیش */
+                if (preg_match('/^[A-Za-z0-9]{20,64}$/', $q)) $w->orWhere('o.token', $q);
             }))
             ->orderByDesc('o.id')->limit(150)
             ->get(['o.id', 'o.user_id', 'o.exams', 'o.payable', 'o.status', 'o.gateway',
-                   'o.gateway_code', 'o.token', 'o.rrn', 'o.created_at', 'o.paid_at',
+                   'o.gateway_code', 'o.token', 'o.rrn', 'o.ref_id', 'o.amount_rial',
+                   'o.created_at', 'o.paid_at',
                    'u.name', 'u.mobile']);
 
         return view('zaban-admin.orders', [
@@ -393,7 +400,8 @@ class ZabanAdminController extends Controller
             'until' => $pricing->accessUntil(),
             'orders' => DB::table('zaban_orders')->where('user_id', $id)
                           ->orderByDesc('id')->limit(10)
-                          ->get(['id', 'exams', 'payable', 'status', 'paid_at', 'created_at']),
+                          ->get(['id', 'exams', 'payable', 'status', 'gateway', 'gateway_code',
+                                 'ref_id', 'rrn', 'paid_at', 'created_at']),
         ]);
     }
 

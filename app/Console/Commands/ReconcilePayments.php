@@ -12,11 +12,12 @@ use Illuminate\Support\Facades\DB;
  *   - pending/verifying قدیمی‌تر از ۲۵ دقیقه → استعلام از ایران کیش؛
  *     اگر درگاه می‌گوید تایید شده، دسترسی داده می‌شود، وگرنه بسته می‌شود.
  * استعلام ایران کیش فقط تا ۷ روز جواب می‌دهد؛ قدیمی‌تر را نمی‌پرسیم.
+ * زرین‌پال: verify دوباره (همان استعلام است)؛ جزئیات در Checkout::reconcileZarinpal.
  */
 class ReconcilePayments extends Command
 {
     protected $signature = 'zaban:reconcile-payments';
-    protected $description = 'تطبیق سفارش‌های پرداخت نیمه‌کاره با درگاه ایران کیش';
+    protected $description = 'تطبیق سفارش‌های پرداخت نیمه‌کاره با درگاه (ایران کیش / زرین‌پال)';
 
     public function handle(Checkout $checkout): int
     {
@@ -29,8 +30,15 @@ class ReconcilePayments extends Command
 
         $tally = [];
         foreach ($orders as $o) {
-            $r = $checkout->reconcile($o);
-            $tally[$r] = ($tally[$r] ?? 0) + 1;
+            try {
+                $r = $checkout->reconcile($o);
+            } catch (\Throwable $e) {
+                /* یک سفارش خراب نباید بقیه را متوقف کند */
+                report($e);
+                $r = 'error';
+            }
+            $key = ($o->gateway ?: 'irankish') . ':' . $r;
+            $tally[$key] = ($tally[$key] ?? 0) + 1;
         }
 
         $this->info($orders->count() . ' سفارش بررسی شد ' . json_encode($tally, JSON_UNESCAPED_UNICODE));

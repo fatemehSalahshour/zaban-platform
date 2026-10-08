@@ -62,9 +62,10 @@ Route::get('/zaban/{path?}', fn () => view('zaban'))
 
 Route::get('/admin/ping', fn () => 'ok')->middleware(['auth', 'zaban.admin']);
 
-/* ---------- خرید (درگاه ایران کیش) ----------
+/* ---------- خرید (درگاه ایران کیش و زرین‌پال) ----------
 | /buy/return بدون auth و بدون CSRF: مرورگر با POST از دامنه‌ی درگاه برمی‌گردد و
-| کوکی نشست (SameSite=Lax) همراهش نیست. اعتبار با نشانه و تاییدیه‌ی سرور‌به‌سرور است. */
+| کوکی نشست (SameSite=Lax) همراهش نیست. اعتبار با نشانه و تاییدیه‌ی سرور‌به‌سرور است.
+| /buy/zarinpal/return هم بدون auth (GET است، CSRF لازم ندارد)؛ اعتبار با verify زرین‌پال. */
 Route::middleware('auth')->group(function () {
     Route::get('/buy', [ZabanPurchaseController::class, 'page'])->name('buy');
     Route::post('/buy', [ZabanPurchaseController::class, 'start'])
@@ -74,6 +75,8 @@ Route::middleware('auth')->group(function () {
 });
 Route::post('/buy/return', [ZabanPurchaseController::class, 'back'])
     ->middleware('throttle:zaban-buy-return')->name('buy.return');
+Route::get('/buy/zarinpal/return', [ZabanPurchaseController::class, 'zarinpalBack'])
+    ->middleware('throttle:zaban-buy-return')->name('buy.zarinpal.return');
 Route::match(['get', 'post'], '/buy/fake', [ZabanPurchaseController::class, 'fake'])->name('buy.fake');
 
 if (app()->environment('local')) {

@@ -38,15 +38,58 @@ class Preflight extends Command
         $admins = DB::table('users')->whereIn('type', ['admin', 'manager'])->whereNotNull('mobile')->count();
         $this->check($admins > 0, "حساب مدیر با موبایل ({$admins})", 'هیچ مدیری با شماره‌ی موبایل نیست؛ اولین ورود SSO حساب تازه‌ی «دانشجو» می‌سازد و پنل در دسترس نیست');
 
+        $this->section('درگاه‌های پرداخت');
+        $on = app(\App\Services\Payment\Gateways::class)->enabled();
+        $this->check(count($on) > 0, 'درگاه روشن: ' . implode('، ', $on),
+            'هیچ درگاهی روشن نیست — IRANKISH_* یا ZARINPAL_MERCHANT_ID در .env');
+        /* authority زرین‌پال ۳۶ حرف است؛ ستون‌ها باید جا داشته باشند */
+        try {
+            $cols = collect(DB::select("SELECT COLUMN_NAME c, CHARACTER_MAXIMUM_LENGTH n FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zaban_orders'"))->pluck('n', 'c');
+            $need = ['gateway' => 10, 'token' => 36, 'authority' => 36, 'ref_id' => 20, 'masked_pan' => 16, 'gateway_code' => 3];
+            $short = collect($need)->filter(fn ($min, $c) => !$cols->has($c) || ($cols[$c] !== null && (int) $cols[$c] < $min))->keys();
+            $this->check($short->isEmpty(), 'ستون‌های zaban_orders برای هر دو درگاه جا دارند',
+                'ستون کوتاه یا ناموجود در zaban_orders: ' . $short->implode(', ') . ' — migration زرین‌پال را اجرا کنید');
+        } catch (\Throwable $e) {
+            $this->soft(false, '', 'بررسی ستون‌های zaban_orders ممکن نشد: ' . $e->getMessage());
+        }
+
+        $this->section('درگاه زرین‌پال');
+        $zp = config('gateways.zarinpal');
+        if (!config('gateways.zarinpal.enabled') || trim((string) ($zp['merchant_id'] ?? '')) === '') {
+            $this->soft(false, '', 'زرین‌پال خاموش است (ZARINPAL_MERCHANT_ID خالی یا ZARINPAL_ENABLED=false)');
+        } else {
+            $this->check(preg_match('/^[0-9a-f-]{36}$/i', (string) $zp['merchant_id']) === 1,
+                'مرچنت زرین‌پال ۳۶ حرفی', 'ZARINPAL_MERCHANT_ID باید ۳۶ حرف (UUID) باشد');
+            $this->check(!($zp['sandbox'] ?? false), 'زرین‌پال روی درگاه واقعی', 'ZARINPAL_SANDBOX=true است — پولی جابه‌جا نمی‌شود');
+            $ca = (string) ($zp['ca_bundle'] ?? '');
+            $this->soft($ca === '' || is_readable($ca), $ca === '' ? 'CA سیستم برای زرین‌پال' : "فایل CA: {$ca}",
+                "ZARINPAL_CA_BUNDLE خوانده نمی‌شود ({$ca}) — CA خود سیستم استفاده می‌شود");
+            try {
+                /* درخواست بی‌بدنه: زرین‌پال با خطای اعتبارسنجی جواب می‌دهد — یعنی TLS و شبکه سالم است */
+                $opt = ($ca !== '' && is_readable($ca)) ? ['verify' => $ca] : ['verify' => true];
+                $res = \Illuminate\Support\Facades\Http::timeout(15)->withOptions($opt)->acceptJson()
+                    ->get(($zp['sandbox'] ?? false) ? 'https://sandbox.zarinpal.com/pg/v4/payment/request.json'
+                                                    : 'https://payment.zarinpal.com/pg/v4/payment/request.json');
+                $this->check($res->status() > 0, 'اتصال HTTPS به زرین‌پال (HTTP ' . $res->status() . ')', '');
+            } catch (\Throwable $e) {
+                $this->check(false, '', 'اتصال به زرین‌پال برقرار نشد: ' . mb_substr($e->getMessage(), 0, 160));
+            }
+        }
+
         $this->section('درگاه ایران کیش');
         $ik = config('irankish');
-        $this->check(!($ik['fake'] ?? false), 'درگاه آزمایشی خاموش', 'IRANKISH_FAKE=false بگذارید');
-        $this->check(!empty($ik['terminal_id']) && !empty($ik['acceptor_id']) && !empty($ik['pass_phrase']),
-            'شماره پایانه، پذیرنده و کلمه عبور', 'IRANKISH_TERMINAL_ID / ACCEPTOR_ID / PASS_PHRASE در .env');
-        $keyPath = base_path((string) ($ik['public_key_path'] ?? ''));
-        $keyOk = is_file($keyPath) && @openssl_pkey_get_public((string) file_get_contents($keyPath)) !== false;
-        $this->check($keyOk, 'کلید عمومی ایران کیش معتبر', "فایل کلید پیدا نشد یا PEM معتبر نیست: {$keyPath}");
-        $this->soft(!str_starts_with($keyPath, public_path()), 'کلید بیرون از public', 'کلید درگاه نباید در پوشه‌ی public باشد');
+        if (!isset($on['irankish'])) {
+            $this->soft(false, '', 'ایران کیش خاموش است (IRANKISH_ENABLED=false یا تنظیم نشده) — بقیه‌ی بررسی‌هایش رد شد');
+        } else {
+            $this->check(!($ik['fake'] ?? false), 'درگاه آزمایشی خاموش', 'IRANKISH_FAKE=false بگذارید');
+            $this->check(!empty($ik['terminal_id']) && !empty($ik['acceptor_id']) && !empty($ik['pass_phrase']),
+                'شماره پایانه، پذیرنده و کلمه عبور', 'IRANKISH_TERMINAL_ID / ACCEPTOR_ID / PASS_PHRASE در .env');
+            $keyPath = base_path((string) ($ik['public_key_path'] ?? ''));
+            $keyOk = is_file($keyPath) && @openssl_pkey_get_public((string) file_get_contents($keyPath)) !== false;
+            $this->check($keyOk, 'کلید عمومی ایران کیش معتبر', "فایل کلید پیدا نشد یا PEM معتبر نیست: {$keyPath}");
+            $this->soft(!str_starts_with($keyPath, public_path()), 'کلید بیرون از public', 'کلید درگاه نباید در پوشه‌ی public باشد');
+        }
 
         $this->section('زمان‌بندی (cron)');
         $hb = DB::table('zaban_meta')->where('k', 'schedule_heartbeat')->value('v');
