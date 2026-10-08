@@ -492,7 +492,38 @@ class SyncQuestions extends Command
         $s = str_replace(["\xC2\xA0", "\xE2\x80\x8B"], ' ', $s);
         $s = preg_replace('/[ \t]+/u', ' ', $s);
 
-        return implode("\n\n", self::paragraphs($s));
+        return implode("\n\n", self::mergeBroken(self::paragraphs($s)));
+    }
+
+    /**
+     * متن‌هایی که از PDF/OCR وارد پلتفرم آزمون شده‌اند هر «سطر» دفترچه را یک
+     * پاراگراف جدا دارند (مثلاً «For information proc-» و بعد «essing; the …»).
+     * سطری که وسط جمله شکسته به سطر قبلی چسبانده می‌شود:
+     *   - سطر قبل با خط تیره تمام شده (proc- + essing → processing)، یا با ویرگول؛
+     *   - یا سطر بعد با حرف کوچک شروع شده و سطر قبل جمله‌اش تمام نشده.
+     * فهرست‌های «a) … b) …» و سطرهایی که بعد از نقطه/دونقطه می‌آیند دست نمی‌خورند.
+     */
+    private static function mergeBroken(array $ps): array
+    {
+        $out = [];
+        foreach ($ps as $p) {
+            if ($out) {
+                $k    = array_key_last($out);
+                $prev = $out[$k];
+                $item     = (bool) preg_match('/^(\(?([a-z]|[ivx]{2,4})\)|[a-z]\.|[0-9]{1,2}[\).-]|[·•▪–-])\s/u', $p);
+                $lower    = (bool) preg_match('/^["“‘(]?\p{Ll}/u', $p);
+                $hyphen   = (bool) preg_match('/\p{L}[-‐]$/u', $prev);
+                $comma    = (bool) preg_match('/[,;]$/u', $prev);
+                $finished = (bool) preg_match('/[.?!:]["”’)\]]?$/u', $prev);
+
+                if (!$item && (($hyphen && $lower) || $comma || ($lower && !$finished))) {
+                    $out[$k] = ($hyphen && $lower) ? mb_substr($prev, 0, -1) . $p : $prev . ' ' . $p;
+                    continue;
+                }
+            }
+            $out[] = $p;
+        }
+        return $out;
     }
 
     /**
