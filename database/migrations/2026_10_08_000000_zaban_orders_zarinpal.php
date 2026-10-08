@@ -25,6 +25,13 @@ return new class extends Migration
 
     public function up(): void
     {
+        /* اگر .env خوانده نشود Laravel بی‌صدا سراغ sqlite پیش‌فرض می‌رود؛
+           به‌جای خطای گنگ information_schema، علت واقعی را می‌گوییم. */
+        $driver = DB::connection()->getDriverName();
+        if (!in_array($driver, ['mysql', 'mariadb'], true)) {
+            throw new \RuntimeException("اتصال دیتابیس {$driver} است نه MySQL — فایل .env خوانده نشده (دسترسی فایل را بررسی کنید). هیچ تغییری داده نشد.");
+        }
+
         foreach (self::WANT as $col => $len) {
             $info = DB::selectOne(
                 "SELECT DATA_TYPE t, CHARACTER_MAXIMUM_LENGTH n, IS_NULLABLE nul, COLUMN_DEFAULT d

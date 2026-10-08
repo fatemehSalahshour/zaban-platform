@@ -24,6 +24,14 @@ class Preflight extends Command
     {
         $this->line('');
         $this->section('برنامه');
+        /* .env ناخوانا = Laravel بی‌صدا با تنظیمات پیش‌فرض (sqlite، بدون SSO) بالا می‌آید
+           و optimize همان را کش می‌کند → خطای ۵۰۰ در کل سایت */
+        $this->check(is_readable(base_path('.env')), 'فایل .env خواندنی است',
+            'فایل .env برای کاربر این کانتینر خواندنی نیست — دسترسی/مالک فایل را درست کنید و دوباره optimize بزنید');
+        if (config('database.default') === 'sqlite') {
+            $this->check(false, '', 'دیتابیس روی sqlite پیش‌فرض است — .env خوانده نشده؛ بقیه‌ی بررسی‌ها بی‌معنی است');
+            return self::FAILURE;
+        }
         $this->check(app()->environment('production'), 'APP_ENV=production', 'APP_ENV باید production باشد (الان: ' . app()->environment() . ')');
         $this->check(!config('app.debug'), 'APP_DEBUG خاموش', 'APP_DEBUG=true روی سرور متن خطا و تنظیمات را به کاربر نشان می‌دهد');
         $this->check(str_starts_with((string) config('app.url'), 'https://'), 'APP_URL با https', 'APP_URL باید https و دامنه‌ی واقعی باشد (برگشت درگاه از روی آن ساخته می‌شود)');
