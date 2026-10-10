@@ -157,6 +157,8 @@ class ZabanAdminController extends Controller
             'newPerDay' => app(\App\Services\Security\Settings::class)->newPerDay(),
             'revPerDay' => app(\App\Services\Security\Settings::class)->revPerDay(),
             'secFields' => \App\Services\Security\Settings::FIELDS,
+            /* محافظ محتوا: پنهان شدن صفحه هنگام خروج از پنجره (protect.js) — پیش‌فرض روشن */
+            'guardHide' => DB::table('zaban_meta')->where('k', 'guard_hide_on_blur')->value('v') !== '0',
 
             /* درگاه پرداخت: آمادگی فنی (.env) + انتخاب مدیر */
             'gwReady'   => app(\App\Services\Payment\Gateways::class)->readiness(),
@@ -254,6 +256,10 @@ class ZabanAdminController extends Controller
         /* امنیت محتوا — هر عدد بین کمینه و بیشینه‌ی خودش نگه داشته می‌شود (Settings::FIELDS) */
         app(\App\Services\Security\Settings::class)->save(array_filter($data['sec'] ?? [], fn ($v) => $v !== null),
                                                           $req->boolean('sec_list_meanings'));
+        if ($req->has('guard_form')) {
+            DB::table('zaban_meta')->updateOrInsert(['k' => 'guard_hide_on_blur'],
+                ['v' => $req->boolean('guard_hide') ? '1' : '0', 'updated_at' => now()]);
+        }
         if (isset($data['new_per_day'])) {
             app(\App\Services\Security\Settings::class)->saveNewPerDay((int) $data['new_per_day']);
         }
@@ -356,6 +362,20 @@ class ZabanAdminController extends Controller
                              SUM(status IN ('failed','expired')) AS failed")
                 ->first(),
         ]);
+    }
+
+    /** GET /zaban-admin/secreport — آخرین گزارش امنیتی شبانه */
+    public function secReport(): View
+    {
+        $raw = DB::table('zaban_meta')->where('k', 'secure_report')->value('v');
+        return view('zaban-admin.secreport', ['r' => $raw ? json_decode($raw, true) : null]);
+    }
+
+    /** POST /zaban-admin/secreport/run — ساختن گزارش همین حالا */
+    public function secReportRun(): RedirectResponse
+    {
+        \Illuminate\Support\Facades\Artisan::call('zaban:secure-report', ['--quiet-output' => true]);
+        return redirect()->route('zadmin.secreport')->with('ok', 'گزارش تازه ساخته شد.');
     }
 
     /** POST /zaban-admin/orders/{id}/recheck — استعلام دوباره از درگاه. */

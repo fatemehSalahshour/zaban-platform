@@ -52,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
         $per('zaban-report',         10);
         $per('zaban-report-reply',   20);
         $per('zaban-heartbeat',       6);
+        $per('zaban-event',          12);   // محافظ محتوا خودش هر نوع را حداکثر هر ۳۰ ثانیه می‌فرستد
         $per('zaban-buy',            10);
 
         /* خروج مرکزی: درخواست از سرور auth می‌آید، نه کاربر — با آی‌پی */

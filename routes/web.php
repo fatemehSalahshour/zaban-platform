@@ -161,6 +161,9 @@ Route::middleware(['auth', 'zaban.admin'])
         /* ---------- هشدارهای امنیتی ---------- */
         Route::get('/alerts', [ZabanAdminAlertController::class, 'index'])->name('alerts');
         Route::match(['get', 'post'], '/leak', [ZabanAdminAlertController::class, 'leak'])->name('leak');
+        /* گزارش امنیتی شبانه (zaban:secure-report) */
+        Route::get('/secreport', [ZabanAdminController::class, 'secReport'])->name('secreport');
+        Route::post('/secreport/run', [ZabanAdminController::class, 'secReportRun'])->name('secreport.run');
         Route::post('/users/{id}/unlock', [ZabanAdminAlertController::class, 'unlock'])
             ->whereNumber('id')->name('users.unlock');
 

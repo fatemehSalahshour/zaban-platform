@@ -20,6 +20,23 @@
 </head>
 <body>
 @php
+  /* محافظ محتوا و نشانه‌ی دیدنی — فقط دانشجو (کارکنان نه). کیت امنیت ۲-۸ تا ۲-۱۰.
+     در DOMContentLoaded فعال می‌شود، نه بعد از بار شدن کامل صفحه، تا فاصله‌ای
+     بی‌محافظ نماند. */
+  $zpUser = auth()->user();
+  $zpOn   = $zpUser && !\App\Support\Roles::isStaff($zpUser);
+@endphp
+@if ($zpOn)
+<script>window.ZPROTECT = {!! json_encode([
+  'uid'      => (int) $zpUser->id,
+  'mobile'   => (string) ($zpUser->mobile ?? ''),
+  'hide'     => \Illuminate\Support\Facades\DB::table('zaban_meta')->where('k', 'guard_hide_on_blur')->value('v') !== '0',
+  'endpoint' => url('/api/client-event'),
+  'csrf'     => csrf_token(),
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!};</script>
+<script src="/js/zaban/protect.js?v={{ filemtime(public_path('js/zaban/protect.js')) }}"></script>
+@endif
+@php
   /* نوار قرمز خطاهای جاوااسکریپت — ابزار توسعه است، نه چیزی که کاربر باید
      ببیند: متن خطا و چند خط اول stack را روی صفحه چاپ می‌کند. فقط برای
      کارکنان پلتفرم و روی لوکال. برای بقیه، خطا مثل همیشه در کنسول می‌ماند. */

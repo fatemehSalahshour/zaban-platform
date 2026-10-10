@@ -227,6 +227,14 @@
       @endforeach
     </div>
 
+    <input type="hidden" name="guard_form" value="1">
+    <div class="field">
+      <label class="chk-one"><input type="checkbox" name="guard_hide" value="1" @checked(old('guard_hide', $guardHide))>
+        پنهان شدن صفحه وقتی دانشجو از پنجره بیرون می‌رود
+        <i>جلوی ابزار برش و PrintScreen را می‌گیرد. اگر دانشجوها گفتند کنار صفحه دیکشنری باز می‌کنند و صفحه
+           سیاه می‌شود، خاموشش کنید. نشانه‌ی دیدنی (شناسه و موبایل) و بستن کپی همیشه روشن‌اند.</i></label>
+    </div>
+
     <div class="field">
       <label class="chk-one"><input type="checkbox" name="sec_list_meanings" value="1"
              @checked(old('sec_list_meanings', $sec['list_meanings']))>

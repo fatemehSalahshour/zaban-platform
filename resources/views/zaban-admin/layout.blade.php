@@ -148,6 +148,7 @@ th.num{text-align:right}
       @php $newAlerts = \Illuminate\Support\Facades\DB::table('security_alerts')->whereNull('seen_at')->count(); @endphp
       <a href="{{ route('zadmin.alerts') }}" class="{{ request()->routeIs('zadmin.alerts') ? 'on' : '' }}">هشدارهای امنیتی
         @if ($newAlerts)<span class="nb">{{ $newAlerts }}</span>@endif</a>
+      <a href="{{ route('zadmin.secreport') }}" class="{{ request()->routeIs('zadmin.secreport*') ? 'on' : '' }}">گزارش امنیتی شبانه</a>
     @endif
     @if ($can('leak'))<a href="{{ route('zadmin.leak') }}" class="{{ request()->routeIs('zadmin.leak') ? 'on' : '' }}">ردیابی متن منتشرشده</a>@endif
   </nav>

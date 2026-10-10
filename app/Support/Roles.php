@@ -45,7 +45,7 @@ final class Roles
         'users' => 'users', 'user' => 'users',
         'orders' => 'orders', 'order' => 'orders',
         'words' => 'words', 'content' => 'content', 'reports' => 'reports',
-        'alerts' => 'alerts', 'leak' => 'leak', 'sync' => 'sync',
+        'alerts' => 'alerts', 'secreport' => 'alerts', 'leak' => 'leak', 'sync' => 'sync',
         'import' => 'import', 'announcements' => 'announcements',
     ];
 

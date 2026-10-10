@@ -893,6 +893,28 @@ class ZabanController extends Controller
     }
 
     /**
+     * POST /api/client-event {kinds: [...]} — رویدادهای محافظ محتوا (protect.js).
+     * فقط یک شمارنده‌ی روزانه برای هر کاربر و نوع؛ گزارش شبانه از روی آن ساخته می‌شود.
+     * کارکنان این اسکریپت را ندارند، پس اینجا فقط دانشجو می‌رسد.
+     */
+    public function clientEvent(Request $req): JsonResponse
+    {
+        $d = $req->validate([
+            'kinds'   => 'required|array|max:8',
+            'kinds.*' => 'in:copy,contextmenu,hide,devtools,printscreen,print,key',
+        ]);
+        $uid = $req->user()->id; $day = now()->toDateString();
+        foreach (array_unique($d['kinds']) as $k) {
+            DB::statement(
+                'INSERT INTO zaban_client_events (user_id, day, kind, n, updated_at) VALUES (?, ?, ?, 1, ?)
+                 ON DUPLICATE KEY UPDATE n = n + 1, updated_at = VALUES(updated_at)',
+                [$uid, $day, $k, now()]
+            );
+        }
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * POST /api/deck/clear {t: w|q} — خالی کردن کل دک کلمه یا تست.
      *
      * تا قبل از این، دکمه‌ی «خالی کردن دک» فقط مجموعه‌ی داخل مرورگر را

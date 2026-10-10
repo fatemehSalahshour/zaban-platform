@@ -24,6 +24,10 @@ Schedule::command('zaban:reconcile-payments')->everyFiveMinutes()->withoutOverla
 Schedule::command('zaban:fsrs-optimize')
     ->weeklyOn(5, '3:20')->withoutOverlapping()->runInBackground();
 
+/* گزارش امنیتی شبانه — پرمصرف‌ها، رویدادهای محافظ مرورگر، هشدارها و قفل‌ها.
+   پنل: «گزارش امنیتی شبانه». فقط گزارش می‌سازد. */
+Schedule::command('zaban:secure-report --quiet-output')->dailyAt('05:00')->withoutOverlapping();
+
 /* نبض زمان‌بندی — zaban:preflight از روی این می‌فهمد cron واقعاً اجرا می‌شود یا نه */
 Schedule::call(fn () => \Illuminate\Support\Facades\DB::table('zaban_meta')->updateOrInsert(
     ['k' => 'schedule_heartbeat'], ['v' => now()->toDateTimeString(), 'updated_at' => now()]

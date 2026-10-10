@@ -80,6 +80,8 @@ Route::middleware(['auth:sanctum', 'throttle:zaban-api'])->prefix('api')->group(
 
     /* ---------- فعالیت و رتبه‌بندی ---------- */
     Route::post('heartbeat', [ZabanController::class, 'heartbeat'])->middleware('throttle:zaban-heartbeat');
+    /* رویدادهای محافظ محتوا (کپی، پنهان شدن، ابزار توسعه) — فقط شمارش روزانه */
+    Route::post('client-event', [ZabanController::class, 'clientEvent'])->middleware('throttle:zaban-event');
     Route::get('board',      [ZabanController::class, 'board']);
 
     /* ---------- خرید ---------- */
