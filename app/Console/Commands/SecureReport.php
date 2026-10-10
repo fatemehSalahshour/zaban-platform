@@ -9,8 +9,9 @@ use Illuminate\Support\Facades\Schema;
 /**
  * php artisan zaban:secure-report — گزارش شبانه‌ی رفتار مشکوک (کیت امنیت، بخش ۲-۱۰).
  *
- * هر روز ساعت ۵ صبح با cron (routes/console.php). نتیجه در zaban_meta
- * (کلید secure_report) ذخیره می‌شود و در پنل، «گزارش امنیتی شبانه» نشان داده می‌شود.
+ * هر روز ساعت ۵ صبح با cron (routes/console.php). نتیجه در فایل
+ * storage/app/secure-report.json ذخیره می‌شود (ستون v در zaban_meta برای این
+ * حجم کوتاه است) و در پنل، «گزارش امنیتی شبانه» نشان داده می‌شود.
  * فقط می‌خواند و گزارش می‌سازد؛ کسی را قفل نمی‌کند (قفل خودکار کار AbuseGuard است).
  *
  * بازه: ۲۴ ساعت گذشته.
@@ -38,8 +39,7 @@ class SecureReport extends Command
             'pay'      => $this->payments($since),
         ];
 
-        DB::table('zaban_meta')->updateOrInsert(['k' => 'secure_report'],
-            ['v' => json_encode($r, JSON_UNESCAPED_UNICODE), 'updated_at' => now()]);
+        file_put_contents(self::path(), json_encode($r, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
 
         if (!$this->option('quiet-output')) {
             $this->info('گزارش ساخته شد (' . $r['built_at'] . ').');
@@ -47,6 +47,11 @@ class SecureReport extends Command
                 . ' · رویدادهای محافظ: ' . count($r['events']) . ' · قفل‌شده: ' . count($r['locked']));
         }
         return self::SUCCESS;
+    }
+
+    public static function path(): string
+    {
+        return storage_path('app/secure-report.json');
     }
 
     /** ۱۰ کاربرِ پرمصرف — مجموع کلمه + معنی + پاسخِ تازه‌ی باز شده */

@@ -367,8 +367,9 @@ class ZabanAdminController extends Controller
     /** GET /zaban-admin/secreport — آخرین گزارش امنیتی شبانه */
     public function secReport(): View
     {
-        $raw = DB::table('zaban_meta')->where('k', 'secure_report')->value('v');
-        return view('zaban-admin.secreport', ['r' => $raw ? json_decode($raw, true) : null]);
+        $f = \App\Console\Commands\SecureReport::path();
+        $r = is_file($f) ? json_decode((string) file_get_contents($f), true) : null;
+        return view('zaban-admin.secreport', ['r' => is_array($r) ? $r : null]);
     }
 
     /** POST /zaban-admin/secreport/run — ساختن گزارش همین حالا */
