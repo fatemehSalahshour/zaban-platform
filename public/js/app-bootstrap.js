@@ -510,6 +510,8 @@ window.ZABAN = (function () {
         push('POST', '/deck', { t: 'w', ids: ids.slice(i, i + 500), on, src });
       }
     },
+    /* خالی کردن کل دک — یک درخواست، در همان صف نوشتن (ترتیب با بقیه حفظ می‌شود) */
+    deckClear(t, src) { return push('POST', '/deck/clear', { t, src }); },
     deckQBulk(qids, on, src){
       const ids = (qids || []).filter(Boolean);
       for (let i = 0; i < ids.length; i += 500) {

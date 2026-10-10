@@ -231,8 +231,8 @@ function __quietSets(f){__setsQuiet=true;try{f()}finally{__setsQuiet=false}}
      صف نوشتن دقایق طولانی بند می‌آمد؛ ثبت مرور و آزمون هم که پشت همان صف
      بودند، دیر یا هرگز نمی‌رسیدند — دقیقاً همان «ذخیره نمی‌شود» که کاربرها
      گزارش کردند. حالا تغییرهای یک لحظه جمع می‌شوند و یک‌جا می‌روند. */
-  function wrap(set,sendOne,sendMany){
-    const add=set.add.bind(set), del=set.delete.bind(set);
+  function wrap(set,sendOne,sendMany,sendClear){
+    const add=set.add.bind(set), del=set.delete.bind(set), clr=set.clear.bind(set);
     const on=new Set(), off=new Set();
     let timer=null;
 
@@ -260,11 +260,25 @@ function __quietSets(f){__setsQuiet=true;try{f()}finally{__setsQuiet=false}}
     set.delete=function(k){const had=set.has(k);const r=del(k);
       if(!__setsQuiet&&had)queue(k,false);
       return r};
+    /* clear هم باید به سرور برسد. قبلاً پوشش نداشت: «خالی کردن دک» فقط
+       صفحه را خالی می‌کرد و با رفرش کل دک از سرور برمی‌گشت (همان «۸ کلمه
+       که بعد از رفرش هزاران تا می‌شد»). تغییرهای نرفته‌ی قبلی هم بی‌معنی
+       می‌شوند، چون نتیجه‌ی نهایی «خالی» است. */
+    set.clear=function(){
+      if(!__setsQuiet&&set.size){
+        on.clear(); off.clear(); if(timer){clearTimeout(timer);timer=null}
+        if(sendClear) sendClear();
+        else [...set].forEach(k=>queue(k,false));
+      }
+      return clr();
+    };
   }
-  wrap(deck,  (k,on)=>ZABAN.deck(k,on,deckSrc()),  (ks,on)=>ZABAN.deckBulk(ks,on,deckSrc()));
+  wrap(deck,  (k,on)=>ZABAN.deck(k,on,deckSrc()),  (ks,on)=>ZABAN.deckBulk(ks,on,deckSrc()),
+              ()=>ZABAN.deckClear("w","خالی کردن دک"));
   wrap(star,  (k,on)=>ZABAN.star(k,on));
   wrap(deckQ, (k,on)=>{const id=qidOf(k); if(id)ZABAN.deckQ(id,on,deckSrc())},
-              (ks,on)=>ZABAN.deckQBulk(ks.map(qidOf).filter(Boolean),on,deckSrc()));
+              (ks,on)=>ZABAN.deckQBulk(ks.map(qidOf).filter(Boolean),on,deckSrc()),
+              ()=>ZABAN.deckClear("q","خالی کردن دک تست"));
   wrap(starQ, (k,on)=>{const id=qidOf(k); if(id)ZABAN.starQ(id,on)});
 })();
 

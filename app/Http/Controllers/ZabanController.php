@@ -835,7 +835,11 @@ class ZabanController extends Controller
 
         $type = $d['t'] === 'w' ? 'word' : 'question';
         $ids  = $d['ids'] ?? [$d['id']];
-        $ids  = $this->filterEntitledItems($req->user()->id, $type, $ids);
+        /* حق دسترسی فقط برای افزودن لازم است. برداشتن از دک خودِ کاربر همیشه
+           مجاز است — وگرنه کارتی که دسترسی‌اش تمام شده هیچ‌وقت حذف نمی‌شد. */
+        $ids  = $d['on']
+            ? $this->filterEntitledItems($req->user()->id, $type, $ids)
+            : array_values(array_unique(array_map('intval', $ids)));
 
         if (!$ids) return response()->json(['ok' => true, 'changed' => 0]);
 
@@ -862,6 +866,22 @@ class ZabanController extends Controller
         }
 
         return response()->json(['ok' => true, 'changed' => count($ids)]);
+    }
+
+    /**
+     * POST /api/deck/clear {t: w|q} — خالی کردن کل دک کلمه یا تست.
+     *
+     * تا قبل از این، دکمه‌ی «خالی کردن دک» فقط مجموعه‌ی داخل مرورگر را
+     * خالی می‌کرد و چیزی به سرور نمی‌رفت؛ با رفرش، کل دک برمی‌گشت.
+     */
+    public function deckClear(Request $req): JsonResponse
+    {
+        $d = $req->validate(['t' => 'required|in:w,q', 'src' => 'nullable|string|max:40']);
+        $type = $d['t'] === 'w' ? 'word' : 'question';
+        $n = DB::table('deck_items')->where('user_id', $req->user()->id)
+            ->where('item_type', $type)->delete();
+        Log::info('[deck] clear', ['user' => $req->user()->id, 'type' => $type, 'n' => $n, 'src' => $d['src'] ?? null]);
+        return response()->json(['ok' => true, 'changed' => $n]);
     }
 
     public function star(Request $req): JsonResponse
