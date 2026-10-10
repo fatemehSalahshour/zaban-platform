@@ -274,12 +274,14 @@ class ContentBuilder
     {
         $out = [];
         $this->scopeOcc(DB::table('exam_texts'), $exams, $books, $year)
-            ->get(['year', 'exam', 'section', 'passage_number', 'body', 'body_fa'])
+            /* body_fa (ترجمه‌ی کامل پسیج) عمداً نیست: جایی نمایش داده نمی‌شد و فقط
+               یک‌جا و بی‌نشانه به مرورگر می‌رفت */
+            ->get(['year', 'exam', 'section', 'passage_number', 'body'])
             ->each(function ($t) use (&$out) {
                 $key = $t->year . '|' . (self::EXAM_FA[$t->exam] ?? $t->exam)
                      . '|' . (self::SEC_FA[$t->section] ?? $t->section)
                      . '|' . ($t->passage_number ?? 0);
-                $out[$key] = ['en' => $t->body, 'fa' => $t->body_fa];
+                $out[$key] = ['en' => $t->body];
             });
         return $out;
     }
@@ -294,7 +296,7 @@ class ContentBuilder
                 ->when($year, fn ($q) => $q->where('year', $year))
                 ->orderBy('year', 'desc')->orderBy('question_number')
                 ->get(['id', 'year', 'exam', 'question_number', 'section','opt_view',
-                       'passage_number', 'text_id', 'stem', 'stem_fa']);
+                       'passage_number', 'text_id', 'stem']);
 
             if ($qs->isEmpty()) return ['version' => $this->version($exam), 'questions' => []];
 
@@ -331,7 +333,9 @@ class ContentBuilder
                     'sec' => self::SEC_FA[$q->section] ?? $q->section,
                     'p' => $q->passage_number !== null ? (int) $q->passage_number : 0,
                     'text_id' => $q->text_id ? (int) $q->text_id : null,
-                    'stem' => $q->stem, 'stemFa' => $q->stem_fa,
+                    /* stem_fa عمداً نیست: ترجمه‌ی صورت سؤال وکب همان جواب است و
+                       فقط همراه پاسخ (/api/answers) می‌آید */
+                    'stem' => $q->stem,
                     'opts' => array_values(array_map(fn ($x) => $x[0], $o)),
                     'optWords' => array_values(array_map(fn ($x) => $x[1], $o)),
                     'words' => [

@@ -1,8 +1,7 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+/*
+| مسیر پیش‌فرض لاراول «GET /api/user» حذف شد: کل رکورد کاربر را برمی‌گرداند
+| (از جمله session_token) و پلتفرم از آن استفاده نمی‌کرد. همه‌ی مسیرهای API
+| پلتفرم در routes/api-zaban.php هستند.
+*/

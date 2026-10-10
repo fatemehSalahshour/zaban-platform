@@ -69,6 +69,8 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Support\Facades\Cookie::queue(\Illuminate\Support\Facades\Cookie::forget('zaban_replaced'));
         });
         $this->app['router']->pushMiddlewareToGroup('web', \App\Http\Middleware\SingleSession::class);
+        /* هدرهای امنیتی پایه (X-Frame-Options، nosniff، …) روی همه‌ی پاسخ‌ها */
+        $this->app['router']->pushMiddlewareToGroup('web', \App\Http\Middleware\SecurityHeaders::class);
         /* حساب قفل‌شده (AbuseGuard) — همه‌ی /api جواب ۴۲۳ */
         $this->app['router']->pushMiddlewareToGroup('web', \App\Http\Middleware\AccountLock::class);
         /* نشانگر «دستگاه دیگر» را جاوااسکریپت رابط می‌خواند؛ رمزنگاری کوکی آن را ناخوانا می‌کرد.

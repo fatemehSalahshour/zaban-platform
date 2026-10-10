@@ -70,6 +70,16 @@ class Checkout
 
         $amountRial = (int) $q['payable'] * 10;      /* قیمت‌ها تومان‌اند؛ درگاه ریال می‌گیرد */
 
+        /* سفارش‌های نیمه‌کاره‌ی قبلی همین کاربر کنار گذاشته می‌شوند (نه پاک).
+           وگرنه با دو تب یا برگشت و تلاش دوباره، هر دو سفارش قابل پرداخت می‌ماندند
+           و کاربر برای یک رشته دو بار پول می‌داد. فقط pending: سفارشی که در
+           verifying است یعنی پول شاید گرفته شده و reconcile باید تکلیفش را روشن کند.
+           اگر کسی سفارش کنارگذاشته را بپردازد، تأیید/verify فرستاده نمی‌شود و
+           درگاه خودش پول را برمی‌گرداند. */
+        $stale = DB::table('zaban_orders')->where('user_id', $userId)->where('status', 'pending')
+            ->update(['status' => 'expired', 'gateway_code' => 'NEW', 'updated_at' => now()]);
+        if ($stale) Log::info('[Checkout] superseded pending orders', ['user' => $userId, 'n' => $stale]);
+
         $orderId = DB::table('zaban_orders')->insertGetId([
             'user_id'       => $userId,
             'status'        => 'pending',

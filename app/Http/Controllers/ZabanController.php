@@ -156,7 +156,7 @@ class ZabanController extends Controller
         $user = $req->user();
 
         $q = DB::table('questions')->where('id', $id)
-            ->first(['id', 'year', 'exam', 'correct_option', 'explanation']);
+            ->first(['id', 'year', 'exam', 'correct_option', 'explanation', 'stem_fa']);
 
         if (!$q) return response()->json(['error' => 'not_found'], 404);
 
@@ -193,6 +193,9 @@ class ZabanController extends Controller
         return response()->json([
             'correct'     => (int) $q->correct_option,
             'explanation' => $this->wm->mark($user->id, $q->explanation),
+            /* ترجمه‌ی صورت سؤال هم کلید است (در وکب، ترجمه همان جواب است)؛
+               پس فقط همراه پاسخ می‌آید، نه در داده‌ی یک‌جای سؤال‌ها */
+            'stem_fa'     => $q->stem_fa ? $this->wm->mark($user->id, $q->stem_fa) : null,
             'words'       => $this->questionWords($id),
         ]);
     }
@@ -219,7 +222,7 @@ class ZabanController extends Controller
         /* رشته‌ی خریده‌شده، یا دفترچه‌های آزمایشی. scopeQuery در حالت آزمایشی
            همه‌چیز را می‌دهد (مرور باز است)، پس پاسخ‌ها جدا فیلتر می‌شوند. */
         $qs = $this->ent->scopeQuery(DB::table('questions')->whereIn('id', $ids), $uid)
-            ->get(['id', 'year', 'exam', 'correct_option', 'explanation'])
+            ->get(['id', 'year', 'exam', 'correct_option', 'explanation', 'stem_fa'])
             ->filter(fn ($q) => $this->ent->canAnswer($uid, $q->exam, (int) $q->year))
             ->values();
 
@@ -242,7 +245,8 @@ class ZabanController extends Controller
                           'attempt_id' => $gate[1], 'created_at' => now()];
             }
             $out[] = ['id' => $qid, 'correct' => (int) $q->correct_option,
-                      'explanation' => $this->wm->mark($uid, $q->explanation)];
+                      'explanation' => $this->wm->mark($uid, $q->explanation),
+                      'stem_fa' => $q->stem_fa ? $this->wm->mark($uid, $q->stem_fa) : null];
         }
 
         if ($log) {
@@ -309,8 +313,10 @@ class ZabanController extends Controller
             ->join('questions as q', 'q.id', '=', 'a.question_id')
             ->where('q.exam', $code)
             ->groupBy('a.question_id')
-            /* تمرین همیشه پاسخ دارد، پس «نزده» ندارد */
-            ->selectRaw('a.question_id, COUNT(*) AS n, SUM(a.is_correct = 1) AS r, 0 AS b')
+            /* تمرین همیشه پاسخ دارد، پس «نزده» ندارد. هر کاربر یک بار شمرده می‌شود:
+               «درست» یعنی دست‌کم یک بار درست زده — تکرار زدن آمار را جابه‌جا نمی‌کند. */
+            ->selectRaw('a.question_id, COUNT(DISTINCT a.user_id) AS n,
+                         COUNT(DISTINCT CASE WHEN a.is_correct = 1 THEN a.user_id END) AS r, 0 AS b')
             ->get();
 
         $q = [];
@@ -355,8 +361,24 @@ class ZabanController extends Controller
         if (!$q) return response()->json(['error' => 'not_found'], 404);
         /* پاسخ و تشریح: خریدار همه‌جا، آزمایشی فقط روی دفترچه‌های آزمایشی */
         if (!$this->ent->canAnswer($uid, $q->exam, (int) $q->year)) return response()->json(['error' => 'not_entitled'], 403);
-        if ($this->answerGate($uid, $q, $this->openAttempt($uid)) === null) {
+        $gate = $this->answerGate($uid, $q, $this->openAttempt($uid));
+        if ($gate === null) {
             return response()->json(['error' => 'answer_locked'], 409);
+        }
+
+        /* توزیع گزینه‌ها همراه «تعداد درست‌ها» یعنی خودِ کلید (گزینه‌ای که عددش با
+           درست‌ها برابر است). پس این مسیر هم مثل مسیر پاسخ سقف روزانه را مصرف
+           می‌کند و ثبت می‌شود — وگرنه کلید کل بانک بی‌سقف از همین‌جا برداشته می‌شد. */
+        $qa = $this->quota->allow($uid, [$id]);
+        if ($qa['limited']) {
+            return response()->json(['error' => 'daily_limit', 'message' => $this->quota->message()], 429);
+        }
+        if ($qa['fresh']) {
+            DB::table('answer_reveals')->insert([
+                'user_id' => $uid, 'question_id' => $id,
+                'reason' => $gate[0], 'attempt_id' => $gate[1], 'created_at' => now(),
+            ]);
+            $this->guard->afterAnswerReveal($uid);
         }
 
         /* مثل آمار جمعی: آزمون‌های تمام‌شده به‌علاوه‌ی تمرین‌های تک‌تست */
@@ -365,9 +387,11 @@ class ZabanController extends Controller
             ->whereNotNull('t.finished_at')->where('a.question_id', $id)
             ->groupBy('a.chosen')->selectRaw('a.chosen, COUNT(*) AS n')->pluck('n', 'chosen');
 
+        /* تمرین: هر کاربر برای هر گزینه یک رأی — وگرنه یک نفر با ده‌ها بار زدن
+           آمار را به دلخواه می‌چرخاند */
         $practice = DB::table('question_attempts')
             ->where('question_id', $id)
-            ->groupBy('chosen')->selectRaw('chosen, COUNT(*) AS n')->pluck('n', 'chosen');
+            ->groupBy('chosen')->selectRaw('chosen, COUNT(DISTINCT user_id) AS n')->pluck('n', 'chosen');
 
         $opt = [0, 0, 0, 0]; $blank = 0; $total = 0;
         foreach ([$rows, $practice] as $set) {
@@ -701,7 +725,7 @@ class ZabanController extends Controller
             'openAttempt' => $open ? [
                 'id' => (int) $open->id, 'year' => (int) $open->year, 'exam' => $open->exam,
                 'mode' => $open->mode, 'deadline_at' => $open->deadline_at,
-                'state' => json_decode($open->state_json ?: '{}', true),
+                'state' => json_decode($open->state_json ?: '{}'),   /* شیء، نه آرایه: «{}» خالی «[]» نشود */
             ] : null,
         ]);
     }
@@ -1085,7 +1109,7 @@ class ZabanController extends Controller
                     'id' => (int) $open->id, 'resumed' => true,
                     'year' => (int) $open->year, 'exam' => $open->exam, 'mode' => $open->mode,
                     'deadline_at' => $open->deadline_at,
-                    'state' => json_decode($open->state_json ?: '{}', true),
+                    'state' => json_decode($open->state_json ?: '{}'),   /* شیء، نه آرایه: «{}» خالی «[]» نشود */
                 ]);
             }
         }

@@ -95,7 +95,8 @@ class SsoController extends Controller
             $result = $this->resolver->resolve($claims);
         } catch (Throwable $e) {
             Log::error('[SSO] callback failed', ['message' => $e->getMessage(), 'at' => $e->getFile() . ':' . $e->getLine()]);
-            return $this->fail($e->getMessage());
+            /* متن خطای داخلی (آدرس، پاسخ سرور مرکزی…) به کاربر نشان داده نمی‌شود؛ جزئیات در لاگ */
+            return $this->fail('ورود انجام نشد. لطفاً دوباره تلاش کنید.');
         }
 
         $user = $result['user'];
@@ -150,10 +151,21 @@ class SsoController extends Controller
     /** جلوگیری از open redirect: فقط مسیر نسبی یا همین دامنه. */
     private function isInternal(string $url): bool
     {
-        if (str_starts_with($url, '//')) {
-            return false;
+        /* «\» و نویسه‌ی کنترلی هیچ‌جا: مرورگرها «\» را «/» می‌خوانند، پس
+           «/\evil.com» همان «//evil.com» است و از بررسی قبلی (فقط «//») رد می‌شد. */
+        if ($url === '' || str_contains($url, '\\') || preg_match('/[\x00-\x20]/', $url)) return false;
+
+        /* مسیر نسبیِ همین سایت: «/…» ولی نه «//…» */
+        if ($url[0] === '/') {
+            return !isset($url[1]) || $url[1] !== '/';
         }
-        $host = parse_url($url, PHP_URL_HOST);
-        return $host === null || $host === parse_url(config('app.url'), PHP_URL_HOST);
+
+        /* آدرس کامل (SsoAutoLogin آدرس کامل صفحه را می‌فرستد): فقط http(s)، دقیقاً
+           همین دامنه، بدون user@ */
+        $p = parse_url($url);
+        return $p !== false
+            && in_array(strtolower($p['scheme'] ?? ''), ['http', 'https'], true)
+            && !isset($p['user']) && !isset($p['pass'])
+            && strtolower($p['host'] ?? '') === strtolower((string) parse_url(config('app.url'), PHP_URL_HOST));
     }
 }

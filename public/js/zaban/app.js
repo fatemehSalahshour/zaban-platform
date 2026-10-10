@@ -1288,7 +1288,7 @@ function fetchAns(qids){
     const b=need.slice(i,i+40), key=b.join(",");
     if(!ANS_WAIT[key]){
       ANS_WAIT[key]=ZABAN.answers(b).then(r=>{
-        ((r&&r.answers)||[]).forEach(a=>{ANS[a.id]={ans:a.correct-1,exp:a.explanation||""}});
+        ((r&&r.answers)||[]).forEach(a=>{ANS[a.id]={ans:a.correct-1,exp:a.explanation||"",sfa:a.stem_fa||""}});
         ((r&&r.locked)||[]).forEach(id=>{ANS_LOCK[id]=1});
         ((r&&r.limited)||[]).forEach(id=>{ANS_LIMIT[id]=1});
         if(r&&r.limit_message)ANS_LIMIT_MSG=r.limit_message;
@@ -1328,7 +1328,7 @@ function makeQ(y,e,q){
     /* کلمات خودِ متن پسیج/کلوز — جدا از صورت سؤال، چون ده‌ها تاست */
     pws: (real.words.passage||[]).map(id=>WBYID[id]).filter(Boolean),
     main: WBYID[(real.words.option||[])[0]] || null,
-    sec: real.sec, p: real.p, view: real.view || 3, stem: real.stem||"", stemFa: real.stemFa||"",
+    sec: real.sec, p: real.p, view: real.view || 3, stem: real.stem||"", stemFa: (ANS[real.id]&&ANS[real.id].sfa)||"",
     opts: real.opts.map((body,i)=>{
       const w = real.optWords[i]!=null ? WBYID[real.optWords[i]] : null;
       return w || {w:body, fa:"", pos:"", lvl:"", occ:[], ex:[], years:[]};
