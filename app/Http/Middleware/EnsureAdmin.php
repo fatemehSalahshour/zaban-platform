@@ -2,29 +2,39 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Roles;
 use Closure;
 use Illuminate\Http\Request;
 
 /**
  * دسترسی به بخش مدیریت.
  *
- * نقش‌ها همان چیزی هستند که پلتفرم آزمون دارد. اینجا فقط سه نقش بالا
- * اجازه دارند؛ اگر بعداً «اپراتور» هم لازم شد، به همین آرایه اضافه شود.
- *
- * عمداً ۴۰۴ برمی‌گرداند نه ۴۰۳: کاربر عادی حتی نباید بفهمد چنین
- * مسیری وجود دارد.
+ * دو مرحله:
+ *   ۱) فقط کارکنان (مدیر کل، مدیر محتوا، ویراستار). بقیه ۴۰۴ می‌گیرند — عمداً
+ *      نه ۴۰۳: کاربر عادی حتی نباید بفهمد چنین مسیری وجود دارد.
+ *   ۲) هر نقش فقط حوزه‌های خودش (App\Support\Roles). این بررسی روی سرور است و
+ *      برای «دیدن» و «ذخیره» هر دو اعمال می‌شود، نه فقط پنهان کردن لینک.
+ *      route ناشناخته فقط برای مدیر کل باز است.
  */
 class EnsureAdmin
 {
-    private const ALLOWED = ['admin', 'manager', 'editor'];
-
     public function handle(Request $request, Closure $next)
     {
-        $type = $request->user()->type ?? 'student';
+        $user = $request->user();
 
-        if (!in_array($type, self::ALLOWED, true)) {
+        if (!Roles::isStaff($user)) {
             abort(404);
         }
+
+        $area = Roles::areaOfRoute(optional($request->route())->getName());
+        $ok = $area === null ? Roles::isAdmin($user) : Roles::can($user, $area);
+
+        if (!$ok) {
+            if ($request->expectsJson()) abort(403);
+            return redirect()->route('zadmin.dashboard')
+                ->with('denied', 'این بخش برای نقش شما («' . (Roles::LABELS[$user->type] ?? $user->type) . '») باز نیست.');
+        }
+
         return $next($request);
     }
 }

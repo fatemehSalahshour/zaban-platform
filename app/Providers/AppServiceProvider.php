@@ -41,7 +41,13 @@ class AppServiceProvider extends ServiceProvider
         $per('zaban-crowd',          10);
         $per('zaban-words',          60);
         $per('zaban-meanings',      120);
-        $per('zaban-search',         40);
+        /* جست‌وجو روی معنی فارسی است: بی‌سقف، با حدس زدن کلمه‌های فارسی معلوم می‌شد
+           هر کلمه چه معنی‌ای دارد (بدون مصرف سقف معنی). دانشجوی واقعی در روز چند ده
+           جست‌وجو می‌کند؛ ۳۰۰ جای کافی دارد. */
+        RateLimiter::for('zaban-search', fn (Request $r) => [
+            Limit::perMinute(40)->by('zaban-search:' . ($r->user()?->id ?: $r->ip())),
+            Limit::perDay(300)->by('zaban-search-day:' . ($r->user()?->id ?: $r->ip())),
+        ]);
         $per('zaban-profile',        20);
         $per('zaban-report',         10);
         $per('zaban-report-reply',   20);

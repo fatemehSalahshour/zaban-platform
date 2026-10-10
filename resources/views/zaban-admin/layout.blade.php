@@ -124,25 +124,32 @@ th.num{text-align:right}
 <aside class="side">
   <h1>پلتفرم زبان<small>بخش مدیریت</small></h1>
   <nav>
+    @php
+      /* فقط بخش‌هایی که نقش همین کاربر اجازه دارد (همان قاعده‌ی EnsureAdmin) */
+      $me = auth()->user();
+      $can = fn (string $area) => \App\Support\Roles::can($me, $area);
+    @endphp
     <a href="{{ route('zadmin.dashboard') }}" class="{{ request()->routeIs('zadmin.dashboard') ? 'on' : '' }}">خلاصه‌ی وضعیت</a>
-    <a href="{{ route('zadmin.settings') }}"  class="{{ request()->routeIs('zadmin.settings')  ? 'on' : '' }}">قیمت و تاریخ کنکور</a>
-    <a href="{{ route('zadmin.users') }}"     class="{{ request()->routeIs('zadmin.users')     ? 'on' : '' }}">کاربران و دسترسی‌ها</a>
-    <a href="{{ route('zadmin.orders') }}"    class="{{ request()->routeIs('zadmin.order*') ? 'on' : '' }}">سفارش‌ها و پرداخت‌ها</a>
-    <a href="{{ route('zadmin.content') }}"   class="{{ request()->routeIs('zadmin.content')   ? 'on' : '' }}">محتوای بانک</a>
+    @if ($can('settings'))<a href="{{ route('zadmin.settings') }}"  class="{{ request()->routeIs('zadmin.settings')  ? 'on' : '' }}">قیمت و تاریخ کنکور</a>@endif
+    @if ($can('users'))<a href="{{ route('zadmin.users') }}"     class="{{ request()->routeIs('zadmin.users')     ? 'on' : '' }}">کاربران و دسترسی‌ها</a>@endif
+    @if ($can('orders'))<a href="{{ route('zadmin.orders') }}"    class="{{ request()->routeIs('zadmin.order*') ? 'on' : '' }}">سفارش‌ها و پرداخت‌ها</a>@endif
+    @if ($can('content'))<a href="{{ route('zadmin.content') }}"   class="{{ request()->routeIs('zadmin.content')   ? 'on' : '' }}">محتوای بانک</a>@endif
     @php
       /* تنها عددی که در نوار کناری می‌آید: کاری که منتظر مدیر است. */
       $openReports = \Illuminate\Support\Facades\DB::table('reports')->where('state', 'open')->count();
     @endphp
-    <a href="{{ route('zadmin.reports') }}" class="{{ request()->routeIs('zadmin.reports*') ? 'on' : '' }}">گزارش‌های کاربران
-      @if ($openReports)<span class="nb">{{ $openReports }}</span>@endif</a>
-    <a href="{{ route('zadmin.announcements') }}" class="{{ request()->routeIs('zadmin.announcements*') ? 'on' : '' }}">اطلاعیه‌ها</a>
-    <a href="{{ route('zadmin.sync') }}" class="{{ request()->routeIs('zadmin.sync*') ? 'on' : '' }}">همگام‌سازی سؤال‌ها</a>
-    <a href="{{ route('zadmin.words') }}" class="{{ request()->routeIs('zadmin.words*') ? 'on' : '' }}">کلمه‌ها و ظهورها</a>
-    <a href="{{ route('zadmin.import.guide') }}" class="{{ request()->routeIs('zadmin.import.guide') ? 'on' : '' }}">راهنمای ورود اکسل</a>
-    @php $newAlerts = \Illuminate\Support\Facades\DB::table('security_alerts')->whereNull('seen_at')->count(); @endphp
-    <a href="{{ route('zadmin.alerts') }}" class="{{ request()->routeIs('zadmin.alerts') ? 'on' : '' }}">هشدارهای امنیتی
-      @if ($newAlerts)<span class="nb">{{ $newAlerts }}</span>@endif</a>
-    <a href="{{ route('zadmin.leak') }}" class="{{ request()->routeIs('zadmin.leak') ? 'on' : '' }}">ردیابی متن منتشرشده</a>
+    @if ($can('reports'))<a href="{{ route('zadmin.reports') }}" class="{{ request()->routeIs('zadmin.reports*') ? 'on' : '' }}">گزارش‌های کاربران
+      @if ($openReports)<span class="nb">{{ $openReports }}</span>@endif</a>@endif
+    @if ($can('announcements'))<a href="{{ route('zadmin.announcements') }}" class="{{ request()->routeIs('zadmin.announcements*') ? 'on' : '' }}">اطلاعیه‌ها</a>@endif
+    @if ($can('sync'))<a href="{{ route('zadmin.sync') }}" class="{{ request()->routeIs('zadmin.sync*') ? 'on' : '' }}">همگام‌سازی سؤال‌ها</a>@endif
+    @if ($can('words'))<a href="{{ route('zadmin.words') }}" class="{{ request()->routeIs('zadmin.words*') ? 'on' : '' }}">کلمه‌ها و ظهورها</a>@endif
+    @if ($can('import'))<a href="{{ route('zadmin.import.guide') }}" class="{{ request()->routeIs('zadmin.import.guide') ? 'on' : '' }}">راهنمای ورود اکسل</a>@endif
+    @if ($can('alerts'))
+      @php $newAlerts = \Illuminate\Support\Facades\DB::table('security_alerts')->whereNull('seen_at')->count(); @endphp
+      <a href="{{ route('zadmin.alerts') }}" class="{{ request()->routeIs('zadmin.alerts') ? 'on' : '' }}">هشدارهای امنیتی
+        @if ($newAlerts)<span class="nb">{{ $newAlerts }}</span>@endif</a>
+    @endif
+    @if ($can('leak'))<a href="{{ route('zadmin.leak') }}" class="{{ request()->routeIs('zadmin.leak') ? 'on' : '' }}">ردیابی متن منتشرشده</a>@endif
   </nav>
   <div class="out">
     {{ auth()->user()->name }}
@@ -154,6 +161,9 @@ th.num{text-align:right}
 <main>
   @if (session('ok'))
     <div class="flash">{{ session('ok') }}</div>
+  @endif
+  @if (session('denied'))
+    <div class="err">{{ session('denied') }}</div>
   @endif
   @if ($errors->any())
     <div class="err">ذخیره نشد:

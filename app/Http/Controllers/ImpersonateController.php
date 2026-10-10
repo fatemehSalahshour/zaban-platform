@@ -43,6 +43,12 @@ class ImpersonateController extends Controller
         if (!$target) {
             return back()->with('error', 'کاربر یافت نشد.');
         }
+        /* فقط ورود به حساب دانشجو. ورود به حساب یکی از کارکنان راهی برای گرفتن
+           اختیار بیشتر بود (ویراستار ← مدیر کل). مسیر فقط برای مدیر کل باز است
+           (EnsureAdmin، حوزه‌ی impersonate). */
+        if (\App\Support\Roles::isStaff($target)) {
+            return back()->with('error', 'ورود به حساب کارکنان مجاز نیست.');
+        }
         if ($target->id === Auth::id()) {
             return back()->with('error', 'این حساب خودتان است.');
         }
@@ -81,7 +87,7 @@ class ImpersonateController extends Controller
 
         $targetId = Auth::id();
         $admin    = User::find($stash['admin_id']);
-        $isAdmin  = $admin && in_array($admin->type, ['admin', 'manager', 'editor'], true);
+        $isAdmin  = \App\Support\Roles::isStaff($admin);
 
         $request->session()->flush();
         $request->session()->regenerate();

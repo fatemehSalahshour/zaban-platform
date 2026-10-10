@@ -178,7 +178,10 @@ function meanHit(w,q){
         if(MSEARCH[q]!==undefined)return;
         MSEARCH[q]="wait";
         ZABAN.wordSearch(q).then(r=>{MSEARCH[q]=new Set((r&&r.ids)||[]);meaningsArrived()})
-          .catch(e=>{console.error(e);delete MSEARCH[q]});
+          .catch(e=>{console.error(e);delete MSEARCH[q];
+            /* سقف روزانه‌ی جست‌وجوی معنی (۴۲۹) — یک بار بگوییم، نه جای خالی */
+            if(e&&e.tooMany&&!window.__msWarned){window.__msWarned=1;
+              toast("سقف جست‌وجوی معنی فارسی برای امروز پر شده است؛ جست‌وجوی انگلیسی همچنان کار می‌کند.")}});
       },350);
     }
     return false;

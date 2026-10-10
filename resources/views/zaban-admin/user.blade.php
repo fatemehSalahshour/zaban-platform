@@ -82,10 +82,12 @@
             <option value="{{ $code }}" @selected(old('type', $u->type ?: 'student') === $code)>{{ $name }}</option>
           @endforeach
         </select>
-        <p class="warn">
-          هر نقشی جز «دانشجو» دسترسی کامل به همین پنل می‌دهد: قیمت، تخفیف، اطلاعات کاربران و
-          ورود به حساب آن‌ها. هر سه رشته هم بدون خرید برایشان باز می‌شود.
-        </p>
+        <ul class="warn rolehelp">
+          @foreach (\App\Support\Roles::HELP as $code => $help)
+            <li><b>{{ \App\Support\Roles::LABELS[$code] }}:</b> {{ $help }}</li>
+          @endforeach
+        </ul>
+        <p class="warn">هر نقشی جز «دانشجو» هر سه رشته را بدون خرید می‌بیند و قفل خودکار امنیتی روی حسابش اعمال نمی‌شود.</p>
       </div>
     </div>
   </div>
@@ -160,6 +162,8 @@
   .panel select:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold)}
   .field input:disabled{background:var(--surface);color:var(--ink-3)}
   .warn{font-size:12px;color:var(--ink-3);line-height:1.95;margin:8px 0 0;max-width:52ch}
+  .rolehelp{padding-inline-start:18px;max-width:64ch}
+  .rolehelp li{margin-bottom:2px}
 
   .ents{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
   .ent{display:flex;align-items:center;gap:10px;border:1px solid var(--line-2);

@@ -26,10 +26,10 @@
             <td><a href="{{ route('zadmin.user', $u->id) }}">{{ $u->name }}</a></td>
             <td class="num">{{ $u->mobile ?: '—' }}</td>
             <td>
-              @if (in_array($u->type ?? 'student', ['admin','manager','editor']))
-                <span class="tag gold">{{ $u->type }}</span>
+              @if (\App\Support\Roles::isStaff($u))
+                <span class="tag gold">{{ \App\Support\Roles::LABELS[$u->type] ?? $u->type }}</span>
               @else
-                <span class="tag">{{ $u->type ?? 'student' }}</span>
+                <span class="tag">{{ \App\Support\Roles::LABELS[$u->type ?? 'student'] ?? $u->type }}</span>
               @endif
             </td>
             <td>{{ $u->nickname ?: '—' }}</td>
@@ -42,7 +42,8 @@
             </td>
             <td class="row-acts">
               <a class="btn ghost" href="{{ route('zadmin.user', $u->id) }}">ویرایش</a>
-              @if ($u->id !== auth()->id())
+              {{-- ورود به حساب فقط برای دانشجو (ImpersonateController هم روی سرور همین را می‌سنجد) --}}
+              @if ($u->id !== auth()->id() && !\App\Support\Roles::isStaff($u))
                 <form method="post" action="{{ route('impersonate.start', $u->id) }}" class="inline-form">
                   @csrf
                   <button class="btn ghost" type="submit">ورود به حساب</button>
